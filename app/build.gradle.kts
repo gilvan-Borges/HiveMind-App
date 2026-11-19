@@ -67,6 +67,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
 
     implementation("androidx.datastore:datastore-preferences:1.1.4")
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")

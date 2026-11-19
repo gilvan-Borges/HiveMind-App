@@ -1,11 +1,8 @@
 package dev.hivemind.mobile.features.chat
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
-import java.io.ByteArrayOutputStream
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,6 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.api.ImageInput
+import dev.hivemind.mobile.core.media.ImagePrep
+import dev.hivemind.mobile.core.media.prepareImage
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.LaneEventItem
 import dev.hivemind.mobile.core.models.LaneSnapshot
@@ -353,8 +352,16 @@ private fun Composer(container: AppContainer, workspace: String, lane: LaneSnaps
     ) { uri ->
         if (uri != null) {
             container.appScope.launch {
-                val img = uriToImageInput(context, uri)
-                if (img != null) images = images + img
+                val used = images.sumOf { it.dataBase64.length }
+                when (val prep = uriToImageInput(context, uri, used)) {
+                    is ImagePrep.Ok -> {
+                        images = images + prep.toInput(uri)
+                        error = null
+                    }
+                    ImagePrep.TooLarge -> error = "A imagem não cabe no relay (limite de 12 MiB)."
+                    ImagePrep.Unreadable -> error = "Não foi possível ler a imagem."
+                    null -> error = "Não foi possível ler a imagem."
+                }
             }
         }
     }
@@ -622,57 +629,24 @@ private fun RestoredRow(m: RestoredMessage) {
     }
 }
 
-private suspend fun uriToImageInput(context: Context, uri: Uri): ImageInput? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    runCatching {
-        val resolver = context.contentResolver
-        val mime = resolver.getType(uri) ?: "image/*"
-        val raw = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
-        val (bytes, outMime) = shrinkImage(raw, mime)
-        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "imagem"
-        ImageInput(
-            name = name.substringBeforeLast('.') + if (outMime == "image/jpeg") ".jpg" else "",
-            mimeType = outMime,
-            dataBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
-        )
-    }.getOrNull()
-}
+private suspend fun uriToImageInput(context: Context, uri: Uri, alreadyBase64: Int): ImagePrep? =
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val resolver = context.contentResolver
+            val mime = resolver.getType(uri) ?: "image/*"
+            val raw = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching ImagePrep.Unreadable
+            prepareImage(raw, mime, alreadyBase64)
+        }.getOrNull()
+    }
 
-/** Reduz a foto para caber no quadro de 12 MiB do relay. */
-private fun shrinkImage(bytes: ByteArray, mime: String): Pair<ByteArray, String> {
-    if (bytes.size <= 500_000) return bytes to mime
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-        return if (bytes.size <= 1_200_000) bytes to mime else bytes to mime
-    }
-    var sample = 1
-    while (bounds.outWidth / sample > 3200 || bounds.outHeight / sample > 3200) sample *= 2
-    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-        ?: return bytes to mime
-    val longest = maxOf(decoded.width, decoded.height).coerceAtLeast(1)
-    val bmp = if (longest > 1600) {
-        val ratio = 1600f / longest
-        Bitmap.createScaledBitmap(
-            decoded,
-            (decoded.width * ratio).toInt().coerceAtLeast(1),
-            (decoded.height * ratio).toInt().coerceAtLeast(1),
-            true,
-        )
-    } else {
-        decoded
-    }
-    if (bmp !== decoded) decoded.recycle()
-    var quality = 75
-    var out = ByteArray(0)
-    while (quality >= 40) {
-        val bos = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.JPEG, quality, bos)
-        out = bos.toByteArray()
-        if (out.size <= 800_000) break
-        quality -= 10
-    }
-    bmp.recycle()
-    return out to "image/jpeg"
+private fun ImagePrep.Ok.toInput(uri: Uri): ImageInput {
+    val leaf = uri.lastPathSegment?.substringAfterLast('/') ?: "imagem"
+    val base = leaf.substringBeforeLast('.')
+    return ImageInput(
+        name = base + if (mime == "image/jpeg") ".jpg" else "",
+        mimeType = mime,
+        dataBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
+    )
 }
 
 fun formatTokens(tokens: Long): String {
