@@ -24,8 +24,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import dev.hivemind.mobile.features.chat.ChatScreen
 import dev.hivemind.mobile.features.diffs.DiffsScreen
 import dev.hivemind.mobile.features.flow.FlowScreen
-import dev.hivemind.mobile.features.pairing.PairingScreen
 import dev.hivemind.mobile.features.projects.ProjectsScreen
+import dev.hivemind.mobile.features.relay.GateScreen
+import dev.hivemind.mobile.features.relay.RelayDevicesScreen
 import dev.hivemind.mobile.theme.HiveMindTheme
 
 enum class MainTab(val label: String, val icon: ImageVector) {
@@ -44,10 +45,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             HiveMindTheme {
                 val pairing by container.hubState.pairing.collectAsState()
-                if (pairing == null) {
-                    PairingScreen(container)
-                } else {
-                    MainScaffold(container)
+                val loggedIn by container.relay.loggedIn.collectAsState()
+                when {
+                    pairing != null -> MainScaffold(container)
+                    loggedIn -> RelayDevicesScreen(container)
+                    else -> GateScreen(container)
                 }
             }
         }

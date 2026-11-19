@@ -1,6 +1,5 @@
 package dev.hivemind.mobile.core.api
 
-import dev.hivemind.mobile.core.models.ApiErrorBody
 import dev.hivemind.mobile.core.models.AutoReviewStatus
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.core.models.Health
@@ -18,6 +17,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -117,7 +120,11 @@ class ApiClient(private val json: Json) {
     @Volatile
     var token: String = ""
 
-    val isConfigured: Boolean get() = baseUrl.isNotBlank() && token.isNotBlank()
+    /** Quando preenchido, o plano de dados vai pelo túnel cifrado do relay. */
+    @Volatile
+    var tunnel: BridgeTunnel? = null
+
+    val isConfigured: Boolean get() = tunnel != null || (baseUrl.isNotBlank() && token.isNotBlank())
 
     /** Testa a saúde de uma URL candidata (usado no pareamento com fallback). */
     suspend fun healthAt(url: String, token: String): Health {
@@ -194,6 +201,8 @@ class ApiClient(private val json: Json) {
     }
 
     private suspend inline fun <reified T> get(path: String, query: Map<String, String?> = emptyMap()): T {
+        val tun = tunnel
+        if (tun != null) return tunnelCall(tun, "GET", path, query, null)
         val req = Request.Builder().url(buildUrl(path, query)).get()
         authed(req)
         return execute(req.build())
@@ -201,6 +210,8 @@ class ApiClient(private val json: Json) {
 
     private suspend inline fun <reified T, reified B : Any> post(path: String, body: B): T {
         val jsonBody = json.encodeToString(body)
+        val tun = tunnel
+        if (tun != null) return tunnelCall(tun, "POST", path, emptyMap(), jsonBody)
         val req = Request.Builder()
             .url(buildUrl(path, emptyMap()))
             .post(jsonBody.toRequestBody(mediaType))
@@ -208,12 +219,43 @@ class ApiClient(private val json: Json) {
         return execute(req.build())
     }
 
+    private suspend inline fun <reified T> tunnelCall(
+        tun: BridgeTunnel,
+        method: String,
+        path: String,
+        query: Map<String, String?>,
+        body: String?,
+    ): T {
+        if (!tun.ready) throw ApiException("túnel ainda não está pronto")
+        if (!tun.ideOnline && path != "/api/v1/approvals/resolve") throw ApiException("IDE offline")
+        val result = tun.rpc(method, path, queryString(query), body)
+        if (result.status !in 200..299) {
+            throw ApiException(errorMessage(result.body) ?: "HTTP ${result.status}", result.status)
+        }
+        val text = result.body.let { if (it.isBlank() || it == "null") "{}" else it }
+        return json.decodeFromString(text)
+    }
+
+    private fun queryString(query: Map<String, String?>): String =
+        query.filterValues { !it.isNullOrBlank() }
+            .map { (k, v) -> "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v!!, "UTF-8")}" }
+            .joinToString("&")
+
+    private fun errorMessage(text: String): String? {
+        val root = runCatching { json.parseToJsonElement(text) }.getOrNull() as? JsonObject ?: return null
+        val err = root["error"] ?: return null
+        return when (err) {
+            is JsonPrimitive -> err.contentOrNull
+            is JsonObject -> err["message"]?.jsonPrimitive?.contentOrNull
+            else -> null
+        }
+    }
+
     private suspend inline fun <reified T> execute(req: Request): T = withContext(Dispatchers.IO) {
         http.newCall(req).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
-                val msg = runCatching { json.decodeFromString<ApiErrorBody>(text).error }.getOrNull()
-                throw ApiException(msg ?: "HTTP ${resp.code}", resp.code)
+                throw ApiException(errorMessage(text) ?: "HTTP ${resp.code}", resp.code)
             }
             if (text.isBlank()) return@withContext json.decodeFromString<T>("{}")
             json.decodeFromString<T>(text)

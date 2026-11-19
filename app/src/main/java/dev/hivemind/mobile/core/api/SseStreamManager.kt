@@ -46,13 +46,13 @@ class SseStreamManager(
         open()
     }
 
-    fun stop() {
+    fun stop(notify: Boolean = true) {
         stopped = true
         attempts = 0
         handler.removeCallbacks(reconnectRunnable)
         source?.cancel()
         source = null
-        onState(ConnState.Disconnected)
+        if (notify) onState(ConnState.Disconnected)
     }
 
     private fun open() {

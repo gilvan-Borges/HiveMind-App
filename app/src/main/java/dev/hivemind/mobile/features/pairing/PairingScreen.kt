@@ -54,9 +54,9 @@ import dev.hivemind.mobile.theme.TextDim
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
 
-/** Tela de pareamento: QR Code (câmera) ou modo manual (URL + Token). */
+/** Tela de pareamento LAN: QR Code (câmera) ou modo manual (URL + Token). */
 @Composable
-fun PairingScreen(container: AppContainer) {
+fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     var scanning by remember { mutableStateOf(false) }
     var url by remember { mutableStateOf("") }
@@ -69,12 +69,16 @@ fun PairingScreen(container: AppContainer) {
         QrScannerOverlay(
             onResult = { raw ->
                 scanning = false
+                if (dev.hivemind.mobile.core.relay.LinkCodes.parse(raw) != null) {
+                    error = "Esse QR é de acesso remoto (hivemind://link). Entre na conta do relay e vincule a IDE por lá."
+                } else {
                 val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(raw)
                 if (parsed == null) {
                     error = "QR inválido — aponte para o QR exibido na IDE (App Mobile)."
                 } else {
                     error = null
                     finishPairing(container, parsed.first, parsed.second, parsed.third, onState = { connecting = it }, onError = { error = it })
+                }
                 }
             },
             onClose = { scanning = false },
@@ -89,6 +93,10 @@ fun PairingScreen(container: AppContainer) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (onBack != null) {
+            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text("Voltar") }
+            Spacer(Modifier.height(8.dp))
+        }
         Text("HiveMind Mobile", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
             "Continue e comande os trabalhos do HiveMind pelo celular.",
@@ -188,7 +196,11 @@ private fun finishPairing(
 
 /** Overlay de câmera com detecção de QR Code (CameraX + ML Kit). */
 @Composable
-fun QrScannerOverlay(onResult: (String) -> Unit, onClose: () -> Unit) {
+fun QrScannerOverlay(
+    onResult: (String) -> Unit,
+    onClose: () -> Unit,
+    hint: String = "Aponte para o QR exibido na IDE (modal App Mobile)",
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasCamera by remember { mutableStateOf(false) }
@@ -283,7 +295,7 @@ fun QrScannerOverlay(onResult: (String) -> Unit, onClose: () -> Unit) {
             }
         }
         Text(
-            "Aponte para o QR exibido na IDE (modal App Mobile)",
+            hint,
             color = androidx.compose.ui.graphics.Color.White,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier

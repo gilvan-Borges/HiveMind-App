@@ -1,8 +1,11 @@
 package dev.hivemind.mobile.features.chat
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import java.io.ByteArrayOutputStream
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -623,14 +626,53 @@ private suspend fun uriToImageInput(context: Context, uri: Uri): ImageInput? = k
     runCatching {
         val resolver = context.contentResolver
         val mime = resolver.getType(uri) ?: "image/*"
-        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+        val raw = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+        val (bytes, outMime) = shrinkImage(raw, mime)
         val name = uri.lastPathSegment?.substringAfterLast('/') ?: "imagem"
         ImageInput(
-            name = name,
-            mimeType = mime,
+            name = name.substringBeforeLast('.') + if (outMime == "image/jpeg") ".jpg" else "",
+            mimeType = outMime,
             dataBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
         )
     }.getOrNull()
+}
+
+/** Reduz a foto para caber no quadro de 12 MiB do relay. */
+private fun shrinkImage(bytes: ByteArray, mime: String): Pair<ByteArray, String> {
+    if (bytes.size <= 500_000) return bytes to mime
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+        return if (bytes.size <= 1_200_000) bytes to mime else bytes to mime
+    }
+    var sample = 1
+    while (bounds.outWidth / sample > 3200 || bounds.outHeight / sample > 3200) sample *= 2
+    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        ?: return bytes to mime
+    val longest = maxOf(decoded.width, decoded.height).coerceAtLeast(1)
+    val bmp = if (longest > 1600) {
+        val ratio = 1600f / longest
+        Bitmap.createScaledBitmap(
+            decoded,
+            (decoded.width * ratio).toInt().coerceAtLeast(1),
+            (decoded.height * ratio).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        decoded
+    }
+    if (bmp !== decoded) decoded.recycle()
+    var quality = 75
+    var out = ByteArray(0)
+    while (quality >= 40) {
+        val bos = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.JPEG, quality, bos)
+        out = bos.toByteArray()
+        if (out.size <= 800_000) break
+        quality -= 10
+    }
+    bmp.recycle()
+    return out to "image/jpeg"
 }
 
 fun formatTokens(tokens: Long): String {
