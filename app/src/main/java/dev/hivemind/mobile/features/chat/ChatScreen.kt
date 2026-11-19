@@ -58,6 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.api.ImageInput
+import dev.hivemind.mobile.core.media.ImagePrep
+import dev.hivemind.mobile.core.media.prepareImage
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.LaneEventItem
 import dev.hivemind.mobile.core.models.LaneSnapshot
@@ -350,8 +352,16 @@ private fun Composer(container: AppContainer, workspace: String, lane: LaneSnaps
     ) { uri ->
         if (uri != null) {
             container.appScope.launch {
-                val img = uriToImageInput(context, uri)
-                if (img != null) images = images + img
+                val used = images.sumOf { it.dataBase64.length }
+                when (val prep = uriToImageInput(context, uri, used)) {
+                    is ImagePrep.Ok -> {
+                        images = images + prep.toInput(uri)
+                        error = null
+                    }
+                    ImagePrep.TooLarge -> error = "A imagem não cabe no relay (limite de 12 MiB)."
+                    ImagePrep.Unreadable -> error = "Não foi possível ler a imagem."
+                    null -> error = "Não foi possível ler a imagem."
+                }
             }
         }
     }
@@ -619,18 +629,24 @@ private fun RestoredRow(m: RestoredMessage) {
     }
 }
 
-private suspend fun uriToImageInput(context: Context, uri: Uri): ImageInput? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    runCatching {
-        val resolver = context.contentResolver
-        val mime = resolver.getType(uri) ?: "image/*"
-        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
-        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "imagem"
-        ImageInput(
-            name = name,
-            mimeType = mime,
-            dataBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
-        )
-    }.getOrNull()
+private suspend fun uriToImageInput(context: Context, uri: Uri, alreadyBase64: Int): ImagePrep? =
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val resolver = context.contentResolver
+            val mime = resolver.getType(uri) ?: "image/*"
+            val raw = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching ImagePrep.Unreadable
+            prepareImage(raw, mime, alreadyBase64)
+        }.getOrNull()
+    }
+
+private fun ImagePrep.Ok.toInput(uri: Uri): ImageInput {
+    val leaf = uri.lastPathSegment?.substringAfterLast('/') ?: "imagem"
+    val base = leaf.substringBeforeLast('.')
+    return ImageInput(
+        name = base + if (mime == "image/jpeg") ".jpg" else "",
+        mimeType = mime,
+        dataBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
+    )
 }
 
 fun formatTokens(tokens: Long): String {

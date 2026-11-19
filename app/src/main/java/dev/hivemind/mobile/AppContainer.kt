@@ -1,10 +1,18 @@
 package dev.hivemind.mobile
 
 import android.content.Context
+import android.util.Log
 import dev.hivemind.mobile.core.api.ApiClient
 import dev.hivemind.mobile.core.api.SseStreamManager
 import dev.hivemind.mobile.core.notify.LocalNotifier
+import dev.hivemind.mobile.core.relay.KeystoreAccountVault
+import dev.hivemind.mobile.core.relay.Redact
+import dev.hivemind.mobile.core.relay.RelayController
+import dev.hivemind.mobile.core.relay.RelayHttp
+import dev.hivemind.mobile.core.relay.RelayLog
+import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.core.state.HubState
+import dev.hivemind.mobile.core.store.Pairing
 import dev.hivemind.mobile.core.store.PairingStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,19 +41,29 @@ class AppContainer(context: Context) {
         onEvent = { hubState.onStreamEvent(it) },
         onState = { hubState.conn.value = it },
     )
+    val relay = RelayController(
+        http = RelayHttp(),
+        vault = KeystoreAccountVault(context),
+        scope = appScope,
+        log = RelayLog { Log.w("HiveMind", Redact.clean(it)) },
+        onConn = { hubState.conn.value = it },
+        onEvent = { hubState.onStreamEvent(it) },
+        onBeforeTunnel = { sse.stop(notify = false) },
+        onHello = { device -> bindRelay(device.name, device.id) },
+        onTunnelClosed = { clearRelayBinding() },
+    )
 
     init {
         notifier.ensureChannels()
         hubState.onApprovalRequest = { info -> notifier.notifyApproval(info) }
         hubState.onTeamFinished = { snapshot -> notifier.notifyFinished(snapshot) }
 
-        // Troca 4G ↔ Wi-Fi: na primeira tentativa de reconexão, re-prova todas
-        // as URLs salvas (Tailscale → LAN) e migra a conexão para a que
-        // responder — assim o pareamento sobrevive à troca de rede.
+        // Troca 4G ↔ Wi-Fi só no pareamento LAN. O relay tem o próprio backoff.
         appScope.launch {
             hubState.conn.collect { state ->
-                if (state !is dev.hivemind.mobile.core.state.ConnState.Reconnecting || state.attempt != 1) return@collect
+                if (state !is ConnState.Reconnecting || state.attempt != 1) return@collect
                 val p = hubState.pairing.value ?: return@collect
+                if (p.activeUrl?.startsWith("relay://") == true) return@collect
                 val url = pickActiveUrl(p.urls, p.token) ?: return@collect
                 if (url != api.baseUrl) {
                     api.baseUrl = url
@@ -57,7 +75,10 @@ class AppContainer(context: Context) {
     }
 
     /** Aplica o pareamento salvo no cliente HTTP + SSE e conecta o stream. */
-    suspend fun activate(pairing: dev.hivemind.mobile.core.store.Pairing) {
+    suspend fun activate(pairing: Pairing) {
+        relay.preferLan()
+        relay.suspendTunnel()
+        api.tunnel = null
         hubState.setPairing(pairing)
         api.baseUrl = pairing.activeUrl ?: pairing.urls.first()
         api.token = pairing.token
@@ -69,9 +90,36 @@ class AppContainer(context: Context) {
     suspend fun deactivate() {
         sse.stop()
         pairingStore.clear()
+        api.tunnel = null
         hubState.setPairing(null)
         hubState.setProjects(emptyList())
         hubState.setLanes(emptyList())
+    }
+
+    private suspend fun bindRelay(deviceName: String, deviceId: String) {
+        val meta = relay.active.value ?: return
+        sse.stop(notify = false)
+        api.tunnel = relay
+        api.baseUrl = meta.relayUrl
+        api.token = "relay-session"
+        val marker = "relay://$deviceId"
+        val current = hubState.pairing.value
+        if (current?.activeUrl != marker) {
+            hubState.setPairing(Pairing(listOf(meta.relayUrl), "relay-session", deviceName, marker))
+        }
+        refreshProjects()
+        refreshLanes()
+    }
+
+    private fun clearRelayBinding() {
+        api.tunnel = null
+        api.token = ""
+        if (hubState.pairing.value?.activeUrl?.startsWith("relay://") == true) {
+            hubState.setPairing(null)
+            hubState.setProjects(emptyList())
+            hubState.setLanes(emptyList())
+            hubState.conn.value = ConnState.Disconnected
+        }
     }
 
     /** Tenta cada URL do pareamento e usa a primeira que responder. */
@@ -123,11 +171,26 @@ class AppContainer(context: Context) {
         )
     }
 
-    /** Conecta tudo a partir do estado salvo (boot do app). */
+    /**
+     * Restaura o último transporte. Relay com IDE escolhida tem preferência
+     * quando foi o último modo; o pareamento LAN continua independente.
+     */
     fun boot() {
         appScope.launch {
-            val pairing = pairingStore.pairing.first() ?: return@launch
-            activate(pairing)
+            relay.load()
+            val pairing = pairingStore.pairing.first()
+            val prefer = relay.preferred()
+            if (prefer == "lan" && pairing != null) {
+                activate(pairing)
+                return@launch
+            }
+            if (relay.canResumeDevice() && prefer != "lan") {
+                relay.resumeSelected()
+                return@launch
+            }
+            if (pairing != null && prefer != "relay") {
+                activate(pairing)
+            }
         }
     }
 }

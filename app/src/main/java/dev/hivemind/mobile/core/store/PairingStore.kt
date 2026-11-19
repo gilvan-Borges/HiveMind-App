@@ -17,9 +17,10 @@ data class Pairing(
     val host: String,
     val activeUrl: String?,
 ) {
-    /** Rota amigável da URL ativa: "Tailscale" (100.x) ou "Wi-Fi" (LAN). */
+    /** Rota amigável: relay, Tailscale (100.x) ou Wi-Fi (LAN). */
     val routeLabel: String
         get() = when {
+            activeUrl?.startsWith("relay://") == true -> if (host.isNotBlank()) "Relay · $host" else "Relay"
             activeUrl == null -> "—"
             activeUrl.contains("100.") -> "Tailscale"
             else -> "Wi-Fi"

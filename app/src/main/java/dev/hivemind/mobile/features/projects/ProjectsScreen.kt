@@ -49,6 +49,8 @@ fun ProjectsScreen(container: AppContainer, padding: PaddingValues, onOpenChat: 
     val projects by container.hubState.projects.collectAsState()
     val conn by container.hubState.conn.collectAsState()
     val pairing by container.hubState.pairing.collectAsState()
+    val ideOnline by container.relay.ideOnlineState.collectAsState()
+    val relayMode = pairing?.activeUrl?.startsWith("relay://") == true
     var loading by remember { mutableStateOf(false) }
     var unpairConfirm by remember { mutableStateOf(false) }
 
@@ -66,12 +68,13 @@ fun ProjectsScreen(container: AppContainer, padding: PaddingValues, onOpenChat: 
             Column(modifier = Modifier.weight(1f)) {
                 Text("Projetos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    connectionLabel(conn, pairing?.routeLabel),
+                    connectionLabel(conn, pairing?.routeLabel, relayMode && !ideOnline),
                     style = MaterialTheme.typography.labelSmall,
-                    color = when (conn) {
-                        is ConnState.Connected -> SuccessGreen
-                        is ConnState.Reconnecting -> ApprovalAmber
-                        is ConnState.Connecting -> ApprovalAmber
+                    color = when {
+                        relayMode && conn is ConnState.Connected && !ideOnline -> ApprovalAmber
+                        conn is ConnState.Connected -> SuccessGreen
+                        conn is ConnState.Reconnecting -> ApprovalAmber
+                        conn is ConnState.Connecting -> ApprovalAmber
                         else -> TextDim
                     },
                 )
@@ -86,7 +89,9 @@ fun ProjectsScreen(container: AppContainer, padding: PaddingValues, onOpenChat: 
             }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Atualizar")
             }
-            TextButton(onClick = { unpairConfirm = true }) { Text("Desconectar") }
+            TextButton(onClick = { unpairConfirm = true }) {
+                Text(if (relayMode) "Trocar IDE" else "Desconectar")
+            }
         }
 
         if (unpairConfirm) {
@@ -94,13 +99,18 @@ fun ProjectsScreen(container: AppContainer, padding: PaddingValues, onOpenChat: 
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Desconectar do PC?", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (relayMode) "Voltar à lista de IDEs?" else "Desconectar do PC?",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { unpairConfirm = false }) { Text("Cancelar") }
                 TextButton(onClick = {
                     unpairConfirm = false
-                    container.appScope.launch { container.deactivate() }
-                }) { Text("Sim, desconectar", color = MaterialTheme.colorScheme.error) }
+                    container.appScope.launch {
+                        if (relayMode) container.relay.disconnectIde() else container.deactivate()
+                    }
+                }) { Text(if (relayMode) "Sim, trocar" else "Sim, desconectar", color = MaterialTheme.colorScheme.error) }
             }
         }
 
@@ -184,9 +194,10 @@ private fun Badge(text: String, color: androidx.compose.ui.graphics.Color) {
     }
 }
 
-private fun connectionLabel(conn: ConnState, route: String?): String = when (conn) {
-    is ConnState.Connected -> "Conectado · ${route ?: "—"}"
-    is ConnState.Connecting -> "Conectando…"
-    is ConnState.Reconnecting -> "Reconectando (${conn.attempt})…"
-    is ConnState.Disconnected -> "Desconectado"
+private fun connectionLabel(conn: ConnState, route: String?, ideOffline: Boolean): String = when {
+    ideOffline && conn is ConnState.Connected -> "Relay · IDE offline"
+    conn is ConnState.Connected -> "Conectado · ${route ?: "—"}"
+    conn is ConnState.Connecting -> "Conectando…"
+    conn is ConnState.Reconnecting -> "Reconectando (${conn.attempt})…"
+    else -> "Desconectado"
 }

@@ -20,12 +20,32 @@ Execução da spec [`docs/SPEC_APP_MOBILE_NATIVO.md`](https://github.com/gilvan-
   **Auto-Review (Sem Merge)**.
 - **Diffs:** lista de arquivos alterados com `+add / -rem` e visualizador
   colorido de diff.
+- **Acesso remoto (relay):** login com e-mail e senha num relay HTTPS
+  (`cmd/hivemind-relay`). Várias IDEs por conta (online/offline), vínculo
+  `hivemind://link` por QR ou código, revogação, e as mesmas telas do bridge
+  (projetos, chat, aprovações, diffs) pelo túnel WebSocket cifrado (NaCl box).
+  Várias contas no aparelho, cada uma com cofre próprio no Android Keystore.
 - **Pareamento:** QR Code da IDE (CameraX + ML Kit), modo manual
   (URL + Token), **fallback multi-endpoint** (Tailscale → Wi-Fi), indicador
   de rota ativa e reconexão SSE resiliente (backoff exponencial).
+  O pareamento LAN `hivemind://pair` continua independente do relay.
 - **Notificações locais** ao receber aprovação pendente ou término de equipe
   + serviço em primeiro plano (`dataSync`) para manter a conexão em segundo
   plano.
+
+## Acesso remoto
+
+1. No relay (VM sua), a primeira subida cria a conta owner
+   (`HIVEMIND_SEED_EMAIL` / `HIVEMIND_SEED_PASSWORD`). Não há cadastro no app.
+2. No app: **Acesso remoto**, informe `https://<seu-relay>`, o e-mail e a senha.
+3. Na IDE, entre na mesma conta e gere o código/QR **Acesso remoto**, ou gere
+   o código no celular e confirme na IDE. Toque na IDE online para controlar.
+4. **Trocar IDE** volta à lista sem sair da conta. **Sair** revoga a sessão
+   (`hmr_rt_` gira a cada refresh; reuso revoga tudo). **Contas** troca de
+   conta sem misturar token, chave ou sessão.
+
+O plano de dados é `wss://<relay>/api/v1/ws` com `enc: "naclbox"`. HTTP público
+sem TLS é recusado. O bridge na LAN pode continuar em HTTP.
 
 ## Como usar
 
