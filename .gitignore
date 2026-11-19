@@ -5,9 +5,14 @@ local.properties
 .idea/
 .DS_Store
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
 *.apk.idsig
 *.keystore
 !debug.keystore
+screen_check.png
+
+# APK binário vai para GitHub Releases (gh release create)
+/dist/
