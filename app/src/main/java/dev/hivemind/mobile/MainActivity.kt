@@ -75,7 +75,7 @@ fun MainScaffold(container: AppContainer) {
         },
     ) { padding ->
         when (tab) {
-            MainTab.Projects -> ProjectsScreen(container, padding)
+            MainTab.Projects -> ProjectsScreen(container, padding, onOpenChat = { tab = MainTab.Chat })
             MainTab.Chat -> ChatScreen(container, padding)
             MainTab.Flow -> FlowScreen(container, padding, workspace)
             MainTab.Diffs -> DiffsScreen(container, padding, workspace)

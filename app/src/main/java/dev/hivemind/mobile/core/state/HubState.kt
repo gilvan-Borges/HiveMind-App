@@ -110,7 +110,7 @@ class HubState(private val json: Json) {
                         label = e.label.orEmpty(),
                         createdAt = now,
                     )
-                    approvals.lastOrNull()?.let(onApprovalRequest)
+                    approvals.lastOrNull()?.let { onApprovalRequest?.invoke(it) }
                 }
             }
             "finish" -> {

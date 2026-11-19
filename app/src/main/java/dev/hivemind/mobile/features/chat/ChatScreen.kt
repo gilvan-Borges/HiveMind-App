@@ -26,9 +26,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -85,14 +85,15 @@ fun ChatScreen(container: AppContainer, padding: PaddingValues) {
         }
         return
     }
+    val ws: String = workspace ?: return
 
-    val lanes = lanesState.values.filter { it.workspace == workspace }
+    val lanes = lanesState.values.filter { it.workspace == ws }
     val lane = lanes.firstOrNull { it.laneId == container.hubState.selectedLaneId.value }
         ?: lanes.firstOrNull()
 
-    LaunchedEffect(workspace) {
+    LaunchedEffect(ws) {
         container.hubState.selectedLaneId.value = lanes.firstOrNull()?.laneId
-        container.refreshLanes(workspace)
+        container.refreshLanes(ws)
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -102,25 +103,25 @@ fun ChatScreen(container: AppContainer, padding: PaddingValues) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    pairing?.host?.ifBlank { workspace.substringAfterLast('\\').substringAfterLast('/') } ?: "Chat",
+                    pairing?.host?.ifBlank { ws.substringAfterLast('\\').substringAfterLast('/') } ?: "Chat",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(workspace, style = MaterialTheme.typography.labelSmall, color = TextDim, maxLines = 1)
+                Text(ws, style = MaterialTheme.typography.labelSmall, color = TextDim, maxLines = 1)
             }
-            LaneSelector(container, workspace, lanes, lane)
+            LaneSelector(container, ws, lanes, lane)
         }
 
-        ApprovalCards(container, workspace, lanes, lane)
+        ApprovalCards(container, ws, lanes, lane)
 
         if (lane != null) {
             ChatLog(lane, Modifier.weight(1f))
-            Composer(container, workspace, lane)
+            Composer(container, ws, lane)
         } else {
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text("Nenhuma lane ainda — envie a primeira instrução abaixo.", color = TextDim)
             }
-            Composer(container, workspace, null)
+            Composer(container, ws, null)
         }
     }
 }
@@ -378,7 +379,7 @@ private fun Composer(container: AppContainer, workspace: String, lane: LaneSnaps
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { historyOpen = true }) {
-                Icon(Icons.Filled.History, contentDescription = "Histórico de sessões")
+                Icon(Icons.Filled.DateRange, contentDescription = "Histórico de sessões")
             }
         }
         if (images.isNotEmpty()) {
@@ -411,7 +412,7 @@ private fun Composer(container: AppContainer, workspace: String, lane: LaneSnaps
                 IconButton(onClick = {
                     imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }) {
-                    Icon(Icons.Filled.AttachFile, contentDescription = "Anexar imagem")
+                    Icon(Icons.Filled.AddCircle, contentDescription = "Anexar imagem")
                 }
                 IconButton(
                     onClick = {

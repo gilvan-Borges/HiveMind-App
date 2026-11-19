@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "dev.hivemind.mobile.app-release-61:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "dev.hivemind.mobile.app-main-62:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "dev.hivemind.mobile.app-release-61:/drawable_ic_notify.xml.flat",
+        "source": "dev.hivemind.mobile.app-main-62:/drawable/ic_notify.xml"
+    },
+    {
+        "merged": "dev.hivemind.mobile.app-release-61:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "dev.hivemind.mobile.app-main-62:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "dev.hivemind.mobile.app-release-61:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "dev.hivemind.mobile.app-main-62:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    }
+]
