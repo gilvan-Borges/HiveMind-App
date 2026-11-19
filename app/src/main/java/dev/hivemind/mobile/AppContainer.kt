@@ -38,6 +38,22 @@ class AppContainer(context: Context) {
         notifier.ensureChannels()
         hubState.onApprovalRequest = { info -> notifier.notifyApproval(info) }
         hubState.onTeamFinished = { snapshot -> notifier.notifyFinished(snapshot) }
+
+        // Troca 4G ↔ Wi-Fi: na primeira tentativa de reconexão, re-prova todas
+        // as URLs salvas (Tailscale → LAN) e migra a conexão para a que
+        // responder — assim o pareamento sobrevive à troca de rede.
+        appScope.launch {
+            hubState.conn.collect { state ->
+                if (state !is dev.hivemind.mobile.core.state.ConnState.Reconnecting || state.attempt != 1) return@collect
+                val p = hubState.pairing.value ?: return@collect
+                val url = pickActiveUrl(p.urls, p.token) ?: return@collect
+                if (url != api.baseUrl) {
+                    api.baseUrl = url
+                    pairingStore.setActiveUrl(url)
+                    sse.connect(url, p.token)
+                }
+            }
+        }
     }
 
     /** Aplica o pareamento salvo no cliente HTTP + SSE e conecta o stream. */
