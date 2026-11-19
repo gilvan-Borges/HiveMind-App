@@ -174,7 +174,8 @@ private fun finishPairing(
         val active = container.pickActiveUrl(urls, token)
         if (active == null) {
             onState(false)
-            onError("Nenhuma URL respondeu (verifique Tailscale/Wi-Fi e o Bridge na IDE).")
+            val detail = container.lastPickError?.let { " — $it" } ?: ""
+            onError("Nenhuma URL respondeu (verifique Tailscale/Wi-Fi e o Bridge na IDE)$detail")
             return@launch
         }
         val pairing = dev.hivemind.mobile.core.store.Pairing(urls, token, host, active)

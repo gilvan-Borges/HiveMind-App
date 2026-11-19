@@ -13,6 +13,7 @@ import dev.hivemind.mobile.core.models.WorkspaceSessionsSummary
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -126,10 +127,18 @@ class ApiClient(private val json: Json) {
             .get()
             .build()
         return withContext(Dispatchers.IO) {
-            http.newCall(req).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) throw ApiException("HTTP ${resp.code}", resp.code)
-                json.decodeFromString<Health>(text)
+            try {
+                http.newCall(req).execute().use { resp ->
+                    val text = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) throw ApiException("HTTP ${resp.code}", resp.code)
+                    json.decodeFromString<Health>(text)
+                }
+            } catch (e: ApiException) {
+                Log.w("HiveMindMobile", "healthAt($url): ${e.message}")
+                throw e
+            } catch (e: java.io.IOException) {
+                Log.w("HiveMindMobile", "healthAt($url): falha de rede: ${e.message}")
+                throw ApiException("falha de rede: ${e.message}", null)
             }
         }
     }

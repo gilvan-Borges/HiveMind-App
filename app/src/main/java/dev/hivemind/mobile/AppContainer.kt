@@ -76,12 +76,20 @@ class AppContainer(context: Context) {
 
     /** Tenta cada URL do pareamento e usa a primeira que responder. */
     suspend fun pickActiveUrl(urls: List<String>, token: String): String? {
+        var lastError: String? = null
         for (url in urls) {
-            val ok = runCatching { api.healthAt(url, token) }.getOrNull()?.ok == true
+            val ok = runCatching { api.healthAt(url, token) }
+                .onFailure { lastError = it.message }
+                .getOrNull()?.ok == true
             if (ok) return url
         }
+        lastPickError = lastError
         return null
     }
+
+    /** Último erro do probe de URLs (para diagnóstico na tela de pareamento). */
+    @Volatile
+    var lastPickError: String? = null
 
     suspend fun refreshProjects() {
         runCatching { api.projects() }.onSuccess { hubState.setProjects(it) }
