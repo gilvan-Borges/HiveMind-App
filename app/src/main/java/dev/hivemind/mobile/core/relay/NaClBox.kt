@@ -76,6 +76,12 @@ object NaClBox {
     fun encodeKey(key: ByteArray): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(key)
 
+    /** Pública X25519 correspondente à privada de 32 bytes. */
+    fun publicFromPrivate(privateKey: ByteArray): ByteArray {
+        require(privateKey.size == 32)
+        return X25519PrivateKeyParameters(privateKey, 0).generatePublicKey().encoded.copyOf()
+    }
+
     /** Aceita base64 padrão ou base64url, com ou sem padding. */
     fun parseKey(raw: String): ByteArray {
         val decoded = try {

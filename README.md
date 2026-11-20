@@ -33,8 +33,8 @@ flowchart TB
   end
 
   subgraph lan ["LAN ou Tailscale"]
-    Pair["QR hivemind://pair<br/>urls, token, host"]
-    Health["GET /api/v1/health<br/>Authorization: Bearer"]
+    Pair["QR hivemind://pair?v=2<br/>urls, offer, pk, exp, host"]
+    Health["GET /api/v1/health<br/>sem Bearer"]
     Bridge["Remote Bridge da IDE<br/>URL do QR · exemplo :47890"]
     SSE["GET /api/v1/events"]
   end
@@ -62,14 +62,14 @@ Na primeira tentativa de reconexão SSE, se a rota não for relay, o app testa d
 |---|---|---|
 | Portão | Sem pareamento salvo e sem sessão de relay | **Acesso remoto**, **Parear na rede local** ou uma conta já gravada |
 | Login | Acesso remoto | URL do relay, e-mail e senha |
-| Pareamento LAN | A partir do portão, ou da lista de IDEs | QR da IDE ou URL + token |
+| Pareamento LAN | A partir do portão, ou da lista de IDEs | QR v2 da IDE ou colar o mesmo código |
 | IDEs | Conta do relay aberta, sem pareamento LAN ativo | Lista online/offline, **Controlar IDE**, vincular, revogar |
 | Projetos | Transporte ativo | Escolhe o workspace e vê o host e a rota |
 | Chat | Aba inferior | Lane, mensagem, aprovação, anexo |
 | Fluxo | Aba inferior | Tasks, PRs e Auto-Review do projeto escolhido |
 | Diffs | Aba inferior | Lista e o diff de um arquivo |
 
-A barra inferior (Projetos, Chat, Fluxo, Diffs) só entra quando existe pareamento. No modo relay, o menu **Trocar IDE** volta à lista de IDEs e mantém a conta. No modo LAN, **Desconectar do PC** apaga o pareamento do DataStore.
+A barra inferior (Projetos, Chat, Fluxo, Diffs) só entra quando existe pareamento. No modo relay, o menu **Trocar IDE** volta à lista de IDEs e mantém a conta. No modo LAN, **Desconectar do PC** apaga o DataStore e o alias `hm_lan_device`.
 
 ## Requisitos
 
@@ -89,7 +89,7 @@ Conferidos em `build.gradle.kts`, `app/build.gradle.kts`, `gradle.properties` e 
 
 Também entram OkHttp 4.12.0 e `okhttp-sse`, kotlinx-serialization 1.8.1, CameraX 1.4.2, ML Kit Barcode 17.3.0, DataStore Preferences 1.1.4 e Bouncy Castle 1.78.1 (NaCl box).
 
-O aparelho ou o emulador precisa de API 26 ou maior. A câmera é opcional no manifesto (`android.hardware.camera` com `required="false"`): sem ela, o QR não abre e o pareamento manual continua disponível.
+O aparelho ou o emulador precisa de API 26 ou maior. A câmera é opcional no manifesto (`android.hardware.camera` com `required="false"`): sem ela, o QR não abre e dá para colar o código `hivemind://pair?v=2`.
 
 ## Build e instalação no Windows
 
@@ -122,11 +122,12 @@ Testes de unidade do módulo:
 
 ### Rede local (LAN / Tailscale)
 
-1. Na IDE, abra o QR do App Mobile. O parser só aceita `hivemind://pair` com `urls` e `token`. `host` é opcional. Várias URLs vêm separadas por vírgula.
+1. Na IDE, abra o QR do App Mobile. O parser só aceita `hivemind://pair?v=2` com `urls`, `offer` (16 bytes), `pk` (32 bytes) e `exp`. `host` é opcional. Várias URLs vêm separadas por vírgula. Qualquer `token` na query é recusado.
 2. No celular: **Parear na rede local**.
-3. **Escanear QR Code da IDE** (CameraX + ML Kit, permissão de câmera) ou **Pareamento manual (URL + Token)**. O rótulo do campo mostra o exemplo `http://100.x.x.x:47890`. O nome do PC é opcional. O token fica mascarado.
-4. O app chama `GET /api/v1/health` em cada URL, com `Authorization: Bearer <token>`, e usa a primeira resposta com `ok: true`.
-5. Grava a lista, o token, o host e a URL ativa e abre o SSE.
+3. **Escanear QR Code da IDE** (CameraX + ML Kit, permissão de câmera) ou **Colar código da IDE** com o mesmo `hivemind://pair?v=2`.
+4. O app chama `GET /api/v1/health` em cada URL, sem Bearer, e usa a primeira resposta com `ok: true`.
+5. Gera um par X25519 e faz `POST /api/v1/pair/redeem` sem Bearer. O corpo é `appPub`, `nonce` e `ciphertext`. O plaintext da caixa é `{v:2, offer, appPub, nonce}` com nonce de 16 bytes. A resposta abre com a `pk` da oferta e traz `token` `hmlan_…`, `boxPub` e `deviceId`.
+6. Grava `urls`, `host`, `active_url` e `device_id` no DataStore. Token, privada e `boxPub` ficam no alias `hm_lan_device` (AES/GCM/NoPadding). O SSE abre em seguida.
 
 Um QR `hivemind://link` nessa tela é recusado. A mensagem pede para entrar na conta do relay e vincular a IDE por lá.
 
@@ -160,7 +161,7 @@ Na abertura, `AppContainer.boot` restaura o último transporte: pareamento LAN s
 | `features/chat/` | Chat, aprovações, modos, anexo, sessões |
 | `features/diffs/` | Lista e visualizador de diff |
 | `features/flow/` | Tasks, PRs e Auto-Review |
-| `features/pairing/` | QR e pareamento manual |
+| `features/pairing/` | QR v2 e colar o código da IDE |
 | `features/projects/` | Cards e desconectar / trocar IDE |
 | `features/relay/` | Portão, login, IDEs e vínculo |
 | `theme/` | Tema escuro Obsidian (`#090B10`, cartão `#12161F`, Steel Blue `#4C8DFF`) |
@@ -168,7 +169,7 @@ Na abertura, `AppContainer.boot` restaura o último transporte: pareamento LAN s
 
 ## Contrato que o cliente chama
 
-Toda chamada direta ao bridge, inclusive `GET /api/v1/health`, envia `Authorization: Bearer <token>`. Pelo relay, o mesmo caminho vai como RPC cifrado; a allowlist do túnel é esta lista, sem o SSE.
+`GET /api/v1/health` é aberto e não leva Bearer. As outras rotas diretas, inclusive o SSE, vão num quadro `{v:2, deviceId, seq, enc:"naclbox", payload}`. O plaintext é o JSON de antes mais o token. A resposta autenticada também é uma caixa, aberta com a privada do app e a `boxPub` do PC. Cada linha `data:` do SSE é uma caixa; o tipo do evento fica dentro do plaintext. Bearer em claro recebe 401 e o app pede um QR novo. Pelo relay, o mesmo caminho vai como RPC cifrado; a allowlist do túnel é esta lista, sem o SSE.
 
 | Método | Caminho | Uso no app |
 |---|---|---|
@@ -194,13 +195,13 @@ Plano de controle do relay, à parte do bridge: `/api/v1/auth/login`, `/api/v1/a
 
 ## Segurança
 
-O token do pareamento LAN fica no aparelho. `PairingStore` grava `urls`, `token`, `host`, `active_url` e `background` no DataStore Preferences de nome `hivemind_pairing`. A chave do token é a string `token`. Esse valor não passa pelo Android Keystore. **Desconectar do PC** chama `PairingStore.clear()` e apaga o arquivo de preferências inteiro.
+O token do pareamento LAN fica no aparelho, cifrado. `PairingStore` grava só `urls`, `host`, `active_url`, `device_id` e a flag antiga `background` no DataStore `hivemind_pairing`. Não grava token. A privada X25519, o token `hmlan_…` e a `boxPub` do PC ficam num blob AES/GCM/NoPadding cuja chave é o alias `hm_lan_device` do Android Keystore. **Desconectar do PC** apaga o DataStore e esse alias.
 
 O manifesto define `android:usesCleartextTraffic="true"`. O cliente do bridge usa a URL que veio no QR ou no campo manual, e o exemplo da tela é HTTP na porta 47890. Tráfego HTTP na LAN é permitido por esse flag.
 
 O relay é outro cofre. `KeystoreAccountVault` cifra cada segredo com AES/GCM/NoPadding e uma chave AES de 256 bits no Android Keystore (a chave não sai do keystore). Há um alias por conta (`hm_a_` + SHA-256 do id) e um índice cifrado (`hm_relay_index`) com e-mail, URL e papel, sem os tokens. No cofre da conta ficam `accessToken`, `refreshToken`, `accessExpiresAt`, o par de chaves NaCl (`publicKey` / `privateKey`) e a IDE selecionada. Trocar de conta zera a sessão em memória antes de carregar a outra. **Sair** remove os tokens; **Apagar** a conta apaga as preferências e o alias do Keystore.
 
-`android:allowBackup="false"`. Os logs do relay passam por `Redact`, que mascara `hmr_at_`, `hmr_rt_`, `hmr_dev_`, `Bearer` e campos JSON de senha, token e chave privada.
+`android:allowBackup="false"`. Os logs passam por `Redact`, que mascara `hmlan_`, `hmr_at_`, `hmr_rt_`, `hmr_dev_`, `Bearer` e campos JSON de senha, token e chave privada.
 
 Dois pontos que o código deixa em aberto:
 

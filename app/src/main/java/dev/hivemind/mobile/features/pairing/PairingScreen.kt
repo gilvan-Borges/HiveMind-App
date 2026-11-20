@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,8 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -65,6 +64,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import dev.hivemind.mobile.AppContainer
+import dev.hivemind.mobile.core.api.PairQr
+import dev.hivemind.mobile.core.lan.LanMessages
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianSurface
 import dev.hivemind.mobile.theme.SteelBlue
@@ -75,15 +76,13 @@ import dev.hivemind.mobile.ui.StatusPill
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
 
-/** Tela de pareamento LAN: QR Code (câmera) ou modo manual (URL + Token). */
+/** Tela de pareamento LAN: QR `hivemind://pair?v=2` ou colar o mesmo código. */
 @Composable
 fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
-    val context = LocalContext.current
+    val notice by container.lanNotice.collectAsState()
     var scanning by remember { mutableStateOf(false) }
     var showManual by remember { mutableStateOf(false) }
-    var url by remember { mutableStateOf("") }
-    var token by remember { mutableStateOf("") }
-    var host by remember { mutableStateOf("") }
+    var pasted by remember { mutableStateOf("") }
     var connecting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -94,19 +93,13 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 if (dev.hivemind.mobile.core.relay.LinkCodes.parse(raw) != null) {
                     error = "Esse QR é de acesso remoto (hivemind://link). Entre na conta do relay e vincule a IDE por lá."
                 } else {
-                    val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(raw)
-                    if (parsed == null) {
-                        error = "QR inválido — aponte para o QR exibido na IDE (App Mobile)."
-                    } else {
-                        error = null
-                        finishPairing(
-                            container,
-                            parsed.first,
-                            parsed.second,
-                            parsed.third,
-                            onState = { connecting = it },
-                            onError = { error = it },
-                        )
+                    when (val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(raw)) {
+                        is PairQr.Offer -> {
+                            error = null
+                            finishPairing(container, parsed, onState = { connecting = it }, onError = { error = it })
+                        }
+                        PairQr.RejectedToken -> error = LanMessages.TOKEN_QR
+                        PairQr.Invalid -> error = LanMessages.BAD_QR
                     }
                 }
             },
@@ -170,7 +163,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                     .fillMaxWidth()
                     .heightIn(min = 44.dp),
             ) {
-                Text(if (showManual) "Ocultar pareamento manual" else "Pareamento manual (URL + Token)")
+                Text(if (showManual) "Ocultar código colado" else "Colar código da IDE")
             }
 
             if (showManual) {
@@ -182,39 +175,10 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                     unfocusedContainerColor = ObsidianSurface,
                 )
                 OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("URL do PC (ex.: http://100.x.x.x:47890)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = fieldColors,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Next,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = token,
-                    onValueChange = { token = it },
-                    label = { Text("Token") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = fieldColors,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Next,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = host,
-                    onValueChange = { host = it },
-                    label = { Text("Nome do PC (opcional)") },
-                    singleLine = true,
+                    value = pasted,
+                    onValueChange = { pasted = it },
+                    label = { Text("Código hivemind://pair da IDE") },
+                    minLines = 3,
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -223,18 +187,13 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        val urls = url.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                        if (urls.isEmpty() || token.isBlank()) {
-                            error = "Informe a URL e o token."
-                        } else {
-                            finishPairing(
-                                container,
-                                urls,
-                                token.trim(),
-                                host.trim(),
-                                onState = { connecting = it },
-                                onError = { error = it },
-                            )
+                        when (val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(pasted)) {
+                            is PairQr.Offer -> {
+                                error = null
+                                finishPairing(container, parsed, onState = { connecting = it }, onError = { error = it })
+                            }
+                            PairQr.RejectedToken -> error = LanMessages.TOKEN_QR
+                            PairQr.Invalid -> error = LanMessages.BAD_QR
                         }
                     },
                     enabled = !connecting,
@@ -257,36 +216,26 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             }
         }
 
-        if (error != null) {
+        val banner = error ?: notice
+        if (banner != null) {
             Spacer(Modifier.height(12.dp))
-            ErrorBanner(message = error.orEmpty())
+            ErrorBanner(message = banner)
         }
     }
 }
 
-/** Testa URLs em fallback (Tailscale → LAN) e ativa o pareamento. */
+/** Resgata a oferta v2 na primeira URL que responder. */
 private fun finishPairing(
     container: AppContainer,
-    urls: List<String>,
-    token: String,
-    host: String,
+    offer: PairQr.Offer,
     onState: (Boolean) -> Unit,
     onError: (String?) -> Unit,
 ) {
     container.appScope.launch {
         onState(true)
-        val active = container.pickActiveUrl(urls, token)
-        if (active == null) {
-            onState(false)
-            val detail = container.lastPickError?.let { " — $it" } ?: ""
-            onError("Nenhuma URL respondeu (verifique Tailscale/Wi-Fi e o Bridge na IDE)$detail")
-            return@launch
-        }
-        val pairing = dev.hivemind.mobile.core.store.Pairing(urls, token, host, active)
-        container.pairingStore.save(urls, token, host, active)
-        container.activate(pairing)
+        runCatching { container.pair(offer) }
+            .onFailure { onError(it.message ?: LanMessages.BAD_OFFER) }
         onState(false)
-        onError(null)
     }
 }
 

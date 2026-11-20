@@ -67,7 +67,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
-import dev.hivemind.mobile.core.api.PairingParser
 import dev.hivemind.mobile.core.relay.AccountMeta
 import dev.hivemind.mobile.core.relay.DeviceInfo
 import dev.hivemind.mobile.core.relay.LinkCodes
@@ -93,6 +92,7 @@ import kotlinx.coroutines.launch
 fun GateScreen(container: AppContainer) {
     val forceLogin by container.relay.forceLogin.collectAsState()
     val accounts by container.relay.accounts.collectAsState()
+    val notice by container.lanNotice.collectAsState()
     var page by remember { mutableStateOf("gate") }
     val shown = if (forceLogin) "login" else page
     when (shown) {
@@ -103,6 +103,7 @@ fun GateScreen(container: AppContainer) {
         "lan" -> PairingScreen(container, onBack = { page = "gate" })
         else -> GateHome(
             accounts = accounts,
+            notice = notice,
             onRemote = { page = "login" },
             onLan = { page = "lan" },
             onAccount = { container.relay.openLogin(it) },
@@ -113,6 +114,7 @@ fun GateScreen(container: AppContainer) {
 @Composable
 private fun GateHome(
     accounts: List<AccountMeta>,
+    notice: String?,
     onRemote: () -> Unit,
     onLan: () -> Unit,
     onAccount: (AccountMeta) -> Unit,
@@ -141,6 +143,11 @@ private fun GateHome(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
+
+        if (!notice.isNullOrBlank()) {
+            ErrorBanner(message = notice)
+            Spacer(Modifier.height(16.dp))
+        }
 
         HiveCard(contentPadding = PaddingValues(18.dp)) {
             Button(
@@ -688,7 +695,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 scanning = false
                 val parsed = LinkCodes.parse(raw)
                 if (parsed == null) {
-                    error = if (PairingParser.parse(raw) != null) {
+                    error = if (raw.trim().startsWith("hivemind://pair")) {
                         "Esse QR é de pareamento LAN (hivemind://pair)."
                     } else {
                         "QR de vínculo inválido."

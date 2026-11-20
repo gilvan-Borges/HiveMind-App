@@ -99,12 +99,14 @@ class RelayContractTest {
 
     @Test
     fun `redige token senha e bearer`() {
-        val dirty = """bearer hmr_at_abc refresh hmr_rt_zzz {"password":"segredo","refreshToken":"hmr_rt_yyy"}"""
+        val dirty = """bearer hmr_at_abc refresh hmr_rt_zzz hmlan_abcDEF123 {"password":"segredo","refreshToken":"hmr_rt_yyy"}"""
         val clean = Redact.clean(dirty)
         assertFalse(clean.contains("hmr_at_abc"))
         assertFalse(clean.contains("hmr_rt_zzz"))
+        assertFalse(clean.contains("hmlan_abcDEF123"))
         assertFalse(clean.contains("segredo"))
         assertFalse(clean.contains("hmr_rt_yyy"))
+        assertTrue(clean.contains("hmlan_[redacted]"))
         assertTrue(clean.contains("[redacted]"))
     }
 
@@ -118,11 +120,11 @@ class RelayContractTest {
 
     @Test
     fun `rota do pareamento marca relay sem parecer LAN`() {
-        val relay = Pairing(listOf("https://relay.exemplo"), "relay-session", "pc-casa", "relay://dev_1")
+        val relay = Pairing(listOf("https://relay.exemplo"), "pc-casa", "relay://dev_1")
         assertEquals("Relay · pc-casa", relay.routeLabel)
-        val lan = Pairing(listOf("http://192.168.0.15:47890"), "tok", "pc", "http://192.168.0.15:47890")
+        val lan = Pairing(listOf("http://192.168.0.15:47890"), "pc", "http://192.168.0.15:47890", "lan_abc")
         assertEquals("Wi-Fi", lan.routeLabel)
-        val ts = Pairing(listOf("http://100.1.2.3:47890"), "tok", "pc", "http://100.1.2.3:47890")
+        val ts = Pairing(listOf("http://100.1.2.3:47890"), "pc", "http://100.1.2.3:47890", "lan_abc")
         assertEquals("Tailscale", ts.routeLabel)
     }
 

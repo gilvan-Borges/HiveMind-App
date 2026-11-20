@@ -30,6 +30,7 @@ object Backoff {
 
 object Redact {
     private val token = Regex("hmr_(at|rt|dev)_[A-Za-z0-9_-]+")
+    private val lanToken = Regex("hmlan_[A-Za-z0-9_-]+")
     private val bearer = Regex("(?i)bearer\\s+\\S+")
     private val jsonSecret = Regex(
         "(?i)(\"(?:password|currentPassword|newPassword|refreshToken|accessToken|privateKey|deviceToken)\"\\s*:\\s*\")[^\"]*\"",
@@ -37,6 +38,7 @@ object Redact {
 
     fun clean(message: String): String =
         message
+            .replace(lanToken, "hmlan_[redacted]")
             .replace(token, "hmr_\$1_[redacted]")
             .replace(bearer, "Bearer [redacted]")
             .replace(jsonSecret, "\$1[redacted]\"")

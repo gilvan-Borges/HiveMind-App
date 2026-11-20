@@ -1,5 +1,6 @@
 package dev.hivemind.mobile.core.state
 
+import dev.hivemind.mobile.core.lan.LanProtocol
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.ApprovalResolvedPayload
 import dev.hivemind.mobile.core.models.AutoReviewStatus
@@ -12,7 +13,11 @@ import dev.hivemind.mobile.core.store.Pairing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 
 sealed interface ConnState {
     data object Disconnected : ConnState
@@ -155,6 +160,49 @@ class HubState(private val json: Json) {
         autoreview.value = autoreview.value + (st.workspace to st)
     }
 
+    /**
+     * Aplica o quadro resume. O hub manda no máximo 60 eventos por lane;
+     * o que passar disso fica de fora para não crescer a transcrição.
+     */
+    fun onResumePayload(plain: String) {
+        val root = runCatching { json.parseToJsonElement(plain) }.getOrNull() as? JsonObject ?: return
+        val eventsEl = root["events"] as? JsonArray ?: return
+        val events = runCatching { json.decodeFromJsonElement<List<StreamEvent>>(eventsEl) }.getOrDefault(emptyList())
+        val grouped = linkedMapOf<String, MutableList<LaneEventItem>>()
+        val spaces = mutableMapOf<String, String>()
+        val other = mutableListOf<StreamEvent>()
+        for (ev in events) {
+            val data = ev.data
+            if (ev.type == "lane_event" && data is JsonObject && data.containsKey("item")) {
+                val replay = runCatching { json.decodeFromJsonElement<ReplayLane>(data) }.getOrNull()
+                if (replay != null && replay.laneId.isNotBlank()) {
+                    grouped.getOrPut(replay.laneId) { mutableListOf() }.add(replay.item)
+                    if (replay.workspace.isNotBlank()) spaces[replay.laneId] = replay.workspace
+                    continue
+                }
+            }
+            other += ev
+        }
+        if (grouped.isNotEmpty()) {
+            val next = lanes.value.toMutableMap()
+            for ((laneId, items) in grouped) {
+                val ws = spaces[laneId].orEmpty()
+                val current = next.values.firstOrNull { it.laneId == laneId && (ws.isBlank() || it.workspace == ws) }
+                    ?: LaneSnapshot(workspace = ws, laneId = laneId)
+                val capped = if (items.size > LanProtocol.MAX_RESUME_EVENTS) {
+                    items.takeLast(LanProtocol.MAX_RESUME_EVENTS)
+                } else {
+                    items
+                }
+                val updated = current.copy(workspace = ws.ifBlank { current.workspace }, recentEvents = capped)
+                next[updated.key] = updated
+            }
+            lanes.value = next
+            refreshPending()
+        }
+        other.forEach(::onStreamEvent)
+    }
+
     /** Roteia um evento SSE bruto. */
     fun onStreamEvent(ev: StreamEvent) {
         when (ev.type) {
@@ -179,3 +227,10 @@ class HubState(private val json: Json) {
         _pendingApprovals.value = lanes.value.values.flatMap { it.pendingApprovals }
     }
 }
+
+@Serializable
+private data class ReplayLane(
+    val workspace: String = "",
+    val laneId: String = "",
+    val item: LaneEventItem = LaneEventItem(),
+)
