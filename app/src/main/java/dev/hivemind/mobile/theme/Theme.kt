@@ -12,25 +12,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Identidade Obsidian Slate × Silver + Steel Blue (zero roxo).
-val ObsidianBg = Color(0xFF090B10)
-val ObsidianCard = Color(0xFF12161F)
-val ObsidianSurface = Color(0xFF1A202D)
-val ObsidianBorder = Color(0xFF252D3D)
-val SteelBlue = Color(0xFF4C8DFF)
-val SuccessGreen = Color(0xFF34D399)
-val ErrorRed = Color(0xFFF87171)
-val ApprovalAmber = Color(0xFFF5B951)
-val TextPrimary = Color(0xFFEEF1F7)
-val TextDim = Color(0xFF939EB3)
+// Havrus Obsidian & Brand Gold — preto profundo, grafite sólido, branco e dourado (SDD Spec 001).
+val ObsidianBg = Color(0xFF050505)
+val SurfacePanel = Color(0xFF0C0C0C)
+val SurfaceInput = Color(0xFF0A0A0A)
+val ObsidianCard = Color(0xFF111111)
+val SurfaceHover = Color(0xFF1B1B1B)
+val ObsidianSurface = Color(0xFF1F1F1F)
+val ObsidianBorder = Color(0xFF262626)
+
+val ActionPrimary = Color(0xFFF3F2F0)
+val ActionPrimaryText = Color(0xFF090909)
+val BrandGold = Color(0xFFC6A15B)
+val BrandGoldStrong = Color(0xFFE8C881)
+// Alias de compatibilidade apontando para o acento de marca Havrus.
+val SteelBlue = BrandGold
+
+val SuccessGreen = Color(0xFF10B981)
+val ErrorRed = Color(0xFFE58C98)
+val ApprovalAmber = Color(0xFFE2AE62)
+val InfoBlue = Color(0xFF3B82F6)
+
+val TextPrimary = Color(0xFFFFFFFF)
+val TextBody = Color(0xFFE5E5E5)
+val TextDim = Color(0xFFA3A3A3)
+val TextTertiary = Color(0xFF8A8A8A)
 
 private val HiveMindScheme = darkColorScheme(
-    primary = SteelBlue,
-    onPrimary = Color.White,
-    secondary = SteelBlue,
-    onSecondary = Color.White,
+    primary = BrandGold,
+    onPrimary = Color(0xFF111111),
+    secondary = ActionPrimary,
+    onSecondary = ActionPrimaryText,
     tertiary = SuccessGreen,
-    onTertiary = Color.Black,
+    onTertiary = Color(0xFF090909),
     background = ObsidianBg,
     onBackground = TextPrimary,
     surface = ObsidianCard,
@@ -38,12 +52,12 @@ private val HiveMindScheme = darkColorScheme(
     surfaceVariant = ObsidianSurface,
     onSurfaceVariant = TextDim,
     surfaceContainer = ObsidianSurface,
-    surfaceContainerHigh = Color(0xFF222938),
-    surfaceContainerLow = Color(0xFF141822),
+    surfaceContainerHigh = Color(0xFF2B2B2B),
+    surfaceContainerLow = SurfacePanel,
     error = ErrorRed,
-    onError = Color.Black,
+    onError = Color(0xFF2A0A10),
     outline = ObsidianBorder,
-    outlineVariant = Color(0xFF1D2330),
+    outlineVariant = Color(0xFF1B1B1B),
 )
 
 private val HiveMindShapes = Shapes(
@@ -68,7 +82,7 @@ private val HiveMindTypography = Typography(
 
 @Composable
 fun HiveMindTheme(content: @Composable () -> Unit) {
-    // App é dark-only por identidade (fundo Obsidian Slate #090B10, zero roxo).
+    // Dark-only na paleta Havrus Obsidian & Brand Gold (SDD Spec 001).
     MaterialTheme(
         colorScheme = HiveMindScheme,
         shapes = HiveMindShapes,
