@@ -1,106 +1,212 @@
-# HiveMind-App — App Mobile Nativo (Android · Kotlin)
+# HiveMind Mobile
 
-App Android **nativo em Kotlin** (Jetpack Compose) para **continuar e comandar
-os trabalhos do [HiveMind](https://github.com/gilvan-Borges/hivemind-go) pelo
-celular**, em tempo real e com o motor 100% no seu PC.
+**Comande a equipe HiveMind do PC, em tempo real, pelo Android.**
 
-Execução da spec [`docs/SPEC_APP_MOBILE_NATIVO.md`](https://github.com/gilvan-Borges/hivemind-go/blob/main/docs/SPEC_APP_MOBILE_NATIVO.md)
-(arquitetura PC Host ↔ App Nativo via HTTP + SSE, com pareamento por QR Code).
+[![Kotlin 2.1.20](https://img.shields.io/badge/Kotlin-2.1.20-7F52FF?logo=kotlin&logoColor=white)](build.gradle.kts)
+[![Android minSdk 26](https://img.shields.io/badge/Android%20minSdk-26-3DDC84?logo=android&logoColor=white)](app/build.gradle.kts)
+[![versão 0.2.0](https://img.shields.io/badge/vers%C3%A3o-0.2.0-4C8DFF)](app/build.gradle.kts)
 
-## Recursos
+Cliente nativo deste repositório (`HiveMind-App`, rótulo **HiveMind Mobile**, pacote `dev.hivemind.mobile`) para o [HiveMind](https://github.com/gilvan-Borges/hivemind). A equipe de agentes continua no computador. O celular lista os projetos abertos, conversa com as lanes, resolve aprovações, acompanha tasks e pull requests e lê o diff do workspace.
 
-- **Projetos:** cards com branch, stack, equipe ativa, badge pulsante de
-  aprovações pendentes e contagem de lanes rodando.
-- **Chat (Orquestrador):** seletor de lane, streaming ao vivo via SSE,
-  **cards de Aprovação** (aprovar/recusar pelo celular), modos
-  `Auto · Direto · Planejar · Squad`, anexo de imagem (foto/print),
-  **Parar** e **Redirecionar**, histórico de sessões com **Continuar**.
-- **Fluxo & Jira:** **Minhas Tasks Jira** (`assignee = currentUser()`) com
-  busca e botão **Resolver c/ Equipe**, **Fluxo de PRs** e controle do
-  **Auto-Review (Sem Merge)**.
-- **Diffs:** lista de arquivos alterados com `+add / -rem` e visualizador
-  colorido de diff.
-- **Acesso remoto (relay):** login com e-mail e senha num relay HTTPS
-  (`cmd/hivemind-relay`). Várias IDEs por conta (online/offline), vínculo
-  `hivemind://link` por QR ou código, revogação, e as mesmas telas do bridge
-  (projetos, chat, aprovações, diffs) pelo túnel WebSocket cifrado (NaCl box).
-  Várias contas no aparelho, cada uma com cofre próprio no Android Keystore.
-- **Pareamento:** QR Code da IDE (CameraX + ML Kit), modo manual
-  (URL + Token), **fallback multi-endpoint** (Tailscale → Wi-Fi), indicador
-  de rota ativa e reconexão SSE resiliente (backoff exponencial).
-  O pareamento LAN `hivemind://pair` continua independente do relay.
-- **Notificações locais** ao receber aprovação pendente ou término de equipe
-  + serviço em primeiro plano (`dataSync`) para manter a conexão em segundo
-  plano.
+Só Android. O Gradle inclui um único módulo, `:app`. Não há alvo iOS.
 
-## Acesso remoto
+`versionName` **0.2.0**, `versionCode` **3**, `minSdk` **26**, `targetSdk` **36**, `compileSdk` **36**.
 
-1. No relay (VM sua), a primeira subida cria a conta owner
-   (`HIVEMIND_SEED_EMAIL` / `HIVEMIND_SEED_PASSWORD`). Não há cadastro no app.
-2. No app: **Acesso remoto**, informe `https://<seu-relay>`, o e-mail e a senha.
-3. Na IDE, entre na mesma conta e gere o código/QR **Acesso remoto**, ou gere
-   o código no celular e confirme na IDE. Toque na IDE online para controlar.
-4. **Trocar IDE** volta à lista sem sair da conta. **Sair** revoga a sessão
-   (`hmr_rt_` gira a cada refresh; reuso revoga tudo). **Contas** troca de
-   conta sem misturar token, chave ou sessão.
+## O que o app faz
 
-O plano de dados é `wss://<relay>/api/v1/ws` com `enc: "naclbox"`. HTTP público
-sem TLS é recusado. O bridge na LAN pode continuar em HTTP.
+- **Projetos.** Card com nome, branch, stack e equipe ativa. Badge de aprovações pendentes e de lanes rodando. Toque abre o chat; atalhos abrem Fluxo e Diffs.
+- **Chat.** Seletor de lane, eventos ao vivo e modos **Auto**, **Direto**, **Planejar** e **Squad**. Cards **Aprovar** e **Recusar**. **Parar** e **Redirecionar** a lane em execução. Histórico **Sessões do projeto** com **Continuar**. Anexo pelo seletor de fotos do sistema (`PickVisualMedia`, só imagem).
+- **Fluxo & Jira.** Três abas no projeto selecionado: **Minhas Tasks** (busca por chave, título ou status; **Resolver c/ Equipe**), **PRs** (**Analisar c/ Equipe**, modo `plan`) e **Auto-Review (Sem Merge)** (estado, fila, histórico e **Verificar agora**).
+- **Diffs.** Arquivos com contagem de linhas adicionadas e removidas, visualizador colorido e um atalho que leva o caminho do arquivo para o chat.
+- **Dois transportes.** Pareamento LAN/Tailscale pelo QR `hivemind://pair`, ou conta num relay próprio com túnel `naclbox`. Os dois chegam nas mesmas quatro abas.
 
-## Como usar
+Na LAN o stream é `GET /api/v1/events` (SSE, `Accept: text/event-stream`), com reconexão em 1 s, 2 s, 4 s… até 30 s. No relay o mesmo tipo de evento chega no WebSocket; o cliente para o SSE antes de abrir o túnel.
 
-1. Na **HiveMind IDE** (PC): clique em **`mobile: off`** na barra de status e
-   **ligue o bridge** — o QR Code aparece no modal **App Mobile**.
-2. Neste app: **Escanear QR Code da IDE** (ou cole URL + token manualmente).
-3. Pronto — as equipes rodando no PC aparecem aqui em tempo real, e as
-   aprovações somem dos dois lados na hora.
+Notificações locais (canal `hivemind_events`) cobrem aprovação pendente e término de equipe, quando `POST_NOTIFICATIONS` já está concedida.
 
-> O bridge detecta automaticamente o IP **Tailscale** (`100.x.x.x`) e o
-> **Wi-Fi LAN**: funciona em casa e na rua (4G/5G), sem abrir portas no
-> roteador. O token de 256 bits fica em `%LOCALAPPDATA%\HiveMind\remote-bridge.json`
-> no PC — nenhum segredo é copiado para o celular.
+## Como o celular chega no PC
 
-## Contrato da API
+```mermaid
+flowchart TB
+  subgraph phone ["HiveMind Mobile"]
+    Gate["Portão"]
+  end
 
-| Método | Rota | Descrição |
+  subgraph lan ["LAN ou Tailscale"]
+    Pair["QR hivemind://pair<br/>urls, token, host"]
+    Health["GET /api/v1/health<br/>Authorization: Bearer"]
+    Bridge["Remote Bridge da IDE<br/>URL do QR · exemplo :47890"]
+    SSE["GET /api/v1/events"]
+  end
+
+  subgraph relay ["Relay da conta"]
+    Login["POST /api/v1/auth/login<br/>HTTPS"]
+    Link["hivemind://link<br/>código de 10 caracteres"]
+    WS["WebSocket /api/v1/ws<br/>wss · enc naclbox"]
+    Ide["IDE na mesma conta"]
+  end
+
+  Gate -->|"Parear na rede local"| Pair
+  Pair --> Health --> Bridge --> SSE
+  Gate -->|"Acesso remoto"| Login
+  Login --> Link --> WS --> Ide
+```
+
+A URL ativa com `100.` no texto recebe o rótulo **Tailscale**. Qualquer outra URL do pareamento recebe **Wi-Fi**. O marcador `relay://<id da IDE>` recebe **Relay**.
+
+Na primeira tentativa de reconexão SSE, se a rota não for relay, o app testa de novo cada URL do pareamento e troca para a primeira que responder.
+
+## Telas
+
+| Tela | Quando aparece | O que você faz |
 |---|---|---|
-| GET | `/api/v1/health` | Status do host |
-| GET | `/api/v1/projects` | Projetos abertos + lanes + aprovações |
-| GET | `/api/v1/lanes?workspace=` | Estado vivo das lanes |
-| GET | `/api/v1/sessions?workspace=` | Sessões salvas + tokens |
-| GET | `/api/v1/session?workspace=&id=` | Mensagens de uma sessão |
-| POST | `/api/v1/runs/start` | Inicia/continua execução |
-| POST | `/api/v1/runs/cancel` | Para execução na lane |
-| POST | `/api/v1/runs/redirect` | Cancela e redireciona a lane |
-| POST | `/api/v1/approvals/resolve` | Aprova/recusa gate |
-| GET | `/api/v1/git/diffs?workspace=` | Diffs do workspace |
-| GET | `/api/v1/git/prs?workspace=` | PRs abertos + revisão |
-| GET | `/api/v1/git/issues?workspace=` | Tasks Jira/GitHub suas |
-| GET | `/api/v1/autoreview/status?workspace=` | Status do Auto-Review |
+| Portão | Sem pareamento salvo e sem sessão de relay | **Acesso remoto**, **Parear na rede local** ou uma conta já gravada |
+| Login | Acesso remoto | URL do relay, e-mail e senha |
+| Pareamento LAN | A partir do portão, ou da lista de IDEs | QR da IDE ou URL + token |
+| IDEs | Conta do relay aberta, sem pareamento LAN ativo | Lista online/offline, **Controlar IDE**, vincular, revogar |
+| Projetos | Transporte ativo | Escolhe o workspace e vê o host e a rota |
+| Chat | Aba inferior | Lane, mensagem, aprovação, anexo |
+| Fluxo | Aba inferior | Tasks, PRs e Auto-Review do projeto escolhido |
+| Diffs | Aba inferior | Lista e o diff de um arquivo |
+
+A barra inferior (Projetos, Chat, Fluxo, Diffs) só entra quando existe pareamento. No modo relay, o menu **Trocar IDE** volta à lista de IDEs e mantém a conta. No modo LAN, **Desconectar do PC** apaga o pareamento do DataStore.
+
+## Requisitos
+
+Conferidos em `build.gradle.kts`, `app/build.gradle.kts`, `gradle.properties` e `gradle/wrapper/gradle-wrapper.properties`.
+
+| Peça | Versão neste repo |
+|---|---|
+| JDK para o Android Gradle Plugin 8.9 | 21 (`gradle.properties`) |
+| Bytecode do app | Java 17 (`jvmTarget` e `sourceCompatibility`) |
+| Android Gradle Plugin | 8.9.2 |
+| Gradle (wrapper) | 8.14.3 |
+| Kotlin | 2.1.20 |
+| Compose BOM | 2025.05.01 (Material 3) |
+| compileSdk / targetSdk | 36 |
+| minSdk | 26 (Android 8.0) |
+| Heap do daemon | `-Xmx4096m` |
+
+Também entram OkHttp 4.12.0 e `okhttp-sse`, kotlinx-serialization 1.8.1, CameraX 1.4.2, ML Kit Barcode 17.3.0, DataStore Preferences 1.1.4 e Bouncy Castle 1.78.1 (NaCl box).
+
+O aparelho ou o emulador precisa de API 26 ou maior. A câmera é opcional no manifesto (`android.hardware.camera` com `required="false"`): sem ela, o QR não abre e o pareamento manual continua disponível.
+
+## Build e instalação no Windows
+
+Abra a raiz do repositório no Android Studio (JDK 21) e execute o módulo `app`.
+
+Pela linha de comando, na raiz:
+
+```powershell
+.\gradlew.bat assembleDebug
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+`app/build.gradle.kts` não redefine o diretório de saída. O `assembleDebug` deixa o APK em `app\build\outputs\apk\debug\app-debug.apk`.
+
+O tipo `release` existe, com minify desligado e `signingConfig` de debug (APK instalável sem keystore próprio):
+
+```powershell
+.\gradlew.bat assembleRelease
+```
+
+Saída: `app\build\outputs\apk\release\app-release.apk`. Não há tarefa Gradle copiando esse arquivo para `dist\`.
+
+Testes de unidade do módulo:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+## Pareamento
+
+### Rede local (LAN / Tailscale)
+
+1. Na IDE, abra o QR do App Mobile. O parser só aceita `hivemind://pair` com `urls` e `token`. `host` é opcional. Várias URLs vêm separadas por vírgula.
+2. No celular: **Parear na rede local**.
+3. **Escanear QR Code da IDE** (CameraX + ML Kit, permissão de câmera) ou **Pareamento manual (URL + Token)**. O rótulo do campo mostra o exemplo `http://100.x.x.x:47890`. O nome do PC é opcional. O token fica mascarado.
+4. O app chama `GET /api/v1/health` em cada URL, com `Authorization: Bearer <token>`, e usa a primeira resposta com `ok: true`.
+5. Grava a lista, o token, o host e a URL ativa e abre o SSE.
+
+Um QR `hivemind://link` nessa tela é recusado. A mensagem pede para entrar na conta do relay e vincular a IDE por lá.
+
+### Relay
+
+1. **Acesso remoto.** A URL sugerida começa em `https://`. E-mail com `@` e no máximo 200 caracteres. Senha de 10 a 200 caracteres.
+2. O login (`POST /api/v1/auth/login`) só segue se o access token começar com `hmr_at_` e o refresh com `hmr_rt_`.
+3. HTTP fora de loopback (`localhost`, `127.0.0.1`, `::1`) é recusado, no cliente HTTP e de novo na normalização da URL. Relay público usa HTTPS. O WebSocket fica em `/api/v1/ws`: `wss://` para `https://`, `ws://` só no loopback.
+4. Toque **Controlar IDE** numa IDE que já publicou a chave pública. O plano de dados cifra RPC e eventos com `enc: "naclbox"` (X25519 + XSalsa20-Poly1305, o `crypto_box` do NaCl, byte de versão `0x01`, nonce de 24 bytes).
+5. Para vincular: **Ler QR / Código** ou **Gerar no App**. O URI é `hivemind://link?relay=...&code=...`. O código tem 10 caracteres do alfabeto `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` e a tela mostra `ABCD-EFGH-JK`. A própria tela avisa que os dois lados precisam da mesma conta, e que o código vale 10 minutos e é de uso único. Um QR `hivemind://pair` nessa tela é recusado.
+6. **Contas** troca de conta, apaga uma conta, troca a senha ou, se o papel for `owner`, cria um membro (`POST /api/v1/accounts`). Não há autocadastro no app.
+7. **Sair da conta** envia `POST /api/v1/auth/logout` e remove access, refresh, expiração e IDE selecionada daquela conta. **Revogar vínculo** chama `POST /api/v1/devices/{id}/revoke`.
+
+Cada refresh grava o par novo e descarta o refresh anterior no cofre. O comentário em `SessionSecrets.persistRotation` registra que reapresentar o refresh antigo revoga a sessão inteira.
+
+Na abertura, `AppContainer.boot` restaura o último transporte: pareamento LAN se a preferência for `lan`; senão a IDE já escolhida no relay; senão o pareamento LAN de novo, desde que a preferência não seja `relay`.
+
+## Estrutura
+
+| Caminho | Função |
+|---|---|
+| `app/src/main/java/dev/hivemind/mobile/` | `HiveMindApp`, `MainActivity`, `AppContainer` |
+| `core/api/` | Cliente HTTP do bridge, parser `hivemind://pair`, SSE, interface do túnel |
+| `core/connect/` | `ConnectivityService` (`dataSync`), declarado no manifesto |
+| `core/media/` | Limite de 12 MiB do quadro WebSocket e redução da imagem |
+| `core/models/` | Projetos, lanes, sessões, diffs, PRs, issues, Auto-Review |
+| `core/notify/` | Notificações locais |
+| `core/relay/` | Login, cofre, códigos `hivemind://link`, NaCl box, WebSocket |
+| `core/state/` | Estado vivo: conexão, projetos, lanes, aprovações |
+| `core/store/` | `PairingStore` (DataStore do pareamento LAN) |
+| `features/chat/` | Chat, aprovações, modos, anexo, sessões |
+| `features/diffs/` | Lista e visualizador de diff |
+| `features/flow/` | Tasks, PRs e Auto-Review |
+| `features/pairing/` | QR e pareamento manual |
+| `features/projects/` | Cards e desconectar / trocar IDE |
+| `features/relay/` | Portão, login, IDEs e vínculo |
+| `theme/` | Tema escuro Obsidian (`#090B10`, cartão `#12161F`, Steel Blue `#4C8DFF`) |
+| `ui/` | Cards, pills e estados vazios |
+
+## Contrato que o cliente chama
+
+Toda chamada direta ao bridge, inclusive `GET /api/v1/health`, envia `Authorization: Bearer <token>`. Pelo relay, o mesmo caminho vai como RPC cifrado; a allowlist do túnel é esta lista, sem o SSE.
+
+| Método | Caminho | Uso no app |
+|---|---|---|
+| GET | `/api/v1/health` | Prova de vida no pareamento e no host |
+| GET | `/api/v1/projects` | Cards de projeto |
+| GET | `/api/v1/lanes` | Estado das lanes |
+| GET | `/api/v1/sessions` | Sessões salvas do workspace |
+| GET | `/api/v1/session` | Mensagens de uma sessão |
+| POST | `/api/v1/runs/start` | Inicia ou continua uma execução |
+| POST | `/api/v1/runs/cancel` | Para a lane |
+| POST | `/api/v1/runs/redirect` | Cancela e redireciona |
+| POST | `/api/v1/approvals/resolve` | Aprova ou recusa |
+| GET | `/api/v1/git/diffs` | Diffs do workspace |
+| GET | `/api/v1/git/prs` | Pull requests |
+| GET | `/api/v1/git/issues` | Tasks Jira ou GitHub |
+| GET | `/api/v1/autoreview/status` | Estado do Auto-Review |
 | POST | `/api/v1/autoreview/poll` | Verificação imediata |
-| GET | `/api/v1/events` | **SSE** em tempo real |
+| GET | `/api/v1/events` | SSE. Só no HTTP direto; no relay os eventos vêm no WebSocket |
 
-Todas as rotas (exceto `/health`) exigem `Authorization: Bearer <token>`.
+Com a IDE offline, o túnel recusa o RPC, exceto `POST /api/v1/approvals/resolve`.
 
-## Build
+Plano de controle do relay, à parte do bridge: `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout`, `/api/v1/auth/password`, `/api/v1/accounts`, `/api/v1/devices`, `/api/v1/devices/{id}/peer-key`, `/api/v1/devices/{id}/revoke`, `/api/v1/link-codes` e `/api/v1/link-codes/{code}/confirm`.
 
-```powershell
-# Android Studio (JDK 21) ou:
-gradlew.bat assembleRelease
-# APK de saída: app\build\outputs\apk\release\app-release.apk
-# Copiado também para dist\HiveMindMobile.apk
-```
+## Segurança
 
-Instalar direto no celular conectado via USB:
+O token do pareamento LAN fica no aparelho. `PairingStore` grava `urls`, `token`, `host`, `active_url` e `background` no DataStore Preferences de nome `hivemind_pairing`. A chave do token é a string `token`. Esse valor não passa pelo Android Keystore. **Desconectar do PC** chama `PairingStore.clear()` e apaga o arquivo de preferências inteiro.
 
-```powershell
-adb install -r dist\HiveMindMobile.apk
-```
+O manifesto define `android:usesCleartextTraffic="true"`. O cliente do bridge usa a URL que veio no QR ou no campo manual, e o exemplo da tela é HTTP na porta 47890. Tráfego HTTP na LAN é permitido por esse flag.
 
-## Stack
+O relay é outro cofre. `KeystoreAccountVault` cifra cada segredo com AES/GCM/NoPadding e uma chave AES de 256 bits no Android Keystore (a chave não sai do keystore). Há um alias por conta (`hm_a_` + SHA-256 do id) e um índice cifrado (`hm_relay_index`) com e-mail, URL e papel, sem os tokens. No cofre da conta ficam `accessToken`, `refreshToken`, `accessExpiresAt`, o par de chaves NaCl (`publicKey` / `privateKey`) e a IDE selecionada. Trocar de conta zera a sessão em memória antes de carregar a outra. **Sair** remove os tokens; **Apagar** a conta apaga as preferências e o alias do Keystore.
 
-- Kotlin 2.1 · Jetpack Compose (Material 3) · tema Obsidian Graphite
-  (`#0B0D10 / #12151B / #1A1F28` + Steel Blue `#4C8DFF` — zero roxo)
-- OkHttp + okhttp-sse (SSE com reconexão automática) · kotlinx.serialization
-- CameraX + ML Kit Barcode (QR Code) · DataStore (pareamento) ·
-  Android 8+ (minSdk 26, targetSdk 36)
+`android:allowBackup="false"`. Os logs do relay passam por `Redact`, que mascara `hmr_at_`, `hmr_rt_`, `hmr_dev_`, `Bearer` e campos JSON de senha, token e chave privada.
+
+Dois pontos que o código deixa em aberto:
+
+- `ConnectivityService` está no manifesto com `foregroundServiceType="dataSync"`, e `PairingStore` tem a flag `background`. Nenhuma tela chama `ConnectivityService.start` nem `setBackground`.
+- O app declara `POST_NOTIFICATIONS` e só publica a notificação se a permissão já estiver concedida. Não há pedido dessa permissão nas telas.
+
+## Repositório principal
+
+O motor, a IDE e o Remote Bridge estão em [github.com/gilvan-Borges/hivemind](https://github.com/gilvan-Borges/hivemind). Este repositório é só o app Android.
