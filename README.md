@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="assets/brand/hivemind-logo-horizontal.png" alt="HiveMind" width="480">
+</p>
+
 # HiveMind Mobile
 
 **Comande a equipe HiveMind do PC, em tempo real, pelo Android.**
 
-[![Kotlin 2.1.20](https://img.shields.io/badge/Kotlin-2.1.20-7F52FF?logo=kotlin&logoColor=white)](build.gradle.kts)
+[![Kotlin 2.1.20](https://img.shields.io/badge/Kotlin-2.1.20-C6A15B?logo=kotlin&logoColor=white)](build.gradle.kts)
 [![Android minSdk 26](https://img.shields.io/badge/Android%20minSdk-26-3DDC84?logo=android&logoColor=white)](app/build.gradle.kts)
-[![versão 0.2.0](https://img.shields.io/badge/vers%C3%A3o-0.2.0-4C8DFF)](app/build.gradle.kts)
+[![versão 0.2.0](https://img.shields.io/badge/vers%C3%A3o-0.2.0-C6A15B)](app/build.gradle.kts)
 
 Cliente nativo deste repositório (`HiveMind-App`, rótulo **HiveMind Mobile**, pacote `dev.hivemind.mobile`) para o [HiveMind](https://github.com/gilvan-Borges/hivemind). A equipe de agentes continua no computador. O celular lista os projetos abertos, conversa com as lanes, resolve aprovações, acompanha tasks e pull requests e lê o diff do workspace.
 
@@ -164,7 +168,7 @@ Na abertura, `AppContainer.boot` restaura o último transporte: pareamento LAN s
 | `features/pairing/` | QR v2 e colar o código da IDE |
 | `features/projects/` | Cards e desconectar / trocar IDE |
 | `features/relay/` | Portão, login, IDEs e vínculo |
-| `theme/` | Tema escuro Obsidian (`#090B10`, cartão `#12161F`, Steel Blue `#4C8DFF`) |
+| `theme/` | Tema escuro Obsidian (`#050505`, cartão `#111111`, dourado `#C6A15B`) |
 | `ui/` | Cards, pills e estados vazios |
 
 ## Contrato que o cliente chama

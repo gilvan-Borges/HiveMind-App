@@ -278,7 +278,10 @@ private fun JiraTasksTab(
                                 }
                             },
                             enabled = solving == null,
-                            colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SteelBlue,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -436,7 +439,10 @@ private fun PRsTab(
                                 }
                             },
                             enabled = reviewingPr == null,
-                            colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SteelBlue,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -557,7 +563,10 @@ private fun AutoReviewTab(container: AppContainer, workspace: String) {
                                 }
                             },
                             enabled = !polling,
-                            colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SteelBlue,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
