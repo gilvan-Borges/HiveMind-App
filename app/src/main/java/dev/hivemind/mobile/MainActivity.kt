@@ -3,15 +3,22 @@ package dev.hivemind.mobile
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,20 +27,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.features.chat.ChatScreen
 import dev.hivemind.mobile.features.diffs.DiffsScreen
 import dev.hivemind.mobile.features.flow.FlowScreen
 import dev.hivemind.mobile.features.projects.ProjectsScreen
 import dev.hivemind.mobile.features.relay.GateScreen
 import dev.hivemind.mobile.features.relay.RelayDevicesScreen
+import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.HiveMindTheme
+import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.SuccessGreen
+import dev.hivemind.mobile.theme.TextDim
 
 enum class MainTab(val label: String, val icon: ImageVector) {
     Projects("Projetos", Icons.Filled.Home),
-    Chat("Chat", Icons.Filled.Send),
+    Chat("Chat", Icons.AutoMirrored.Filled.Send),
     Flow("Fluxo", Icons.Filled.Build),
-    Diffs("Diffs", Icons.Filled.List),
+    Diffs("Diffs", Icons.AutoMirrored.Filled.List),
 }
 
 class MainActivity : ComponentActivity() {
@@ -59,17 +72,54 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScaffold(container: AppContainer) {
     var tab by remember { mutableStateOf(MainTab.Projects) }
+    var chatDraftSeed by remember { mutableStateOf<String?>(null) }
     val workspace by container.hubState.selectedWorkspace.collectAsState()
+    val pendingApprovals by container.hubState.pendingApprovals.collectAsState()
+    val lanes by container.hubState.lanes.collectAsState()
+    val anyRunning = lanes.values.any { it.running }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+            ) {
                 MainTab.entries.forEach { t ->
+                    val selected = tab == t
                     NavigationBarItem(
-                        selected = tab == t,
+                        selected = selected,
                         onClick = { tab = t },
-                        icon = { Icon(t.icon, contentDescription = t.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = SteelBlue,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = SteelBlue.copy(alpha = 0.16f),
+                            unselectedIconColor = TextDim,
+                            unselectedTextColor = TextDim,
+                        ),
+                        icon = {
+                            if (t == MainTab.Chat && (pendingApprovals.isNotEmpty() || anyRunning)) {
+                                BadgedBox(
+                                    badge = {
+                                        if (pendingApprovals.isNotEmpty()) {
+                                            Badge(containerColor = ApprovalAmber, contentColor = MaterialTheme.colorScheme.background) {
+                                                Text(pendingApprovals.size.toString())
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(SuccessGreen, CircleShape),
+                                            )
+                                        }
+                                    },
+                                ) {
+                                    Icon(t.icon, contentDescription = t.label)
+                                }
+                            } else {
+                                Icon(t.icon, contentDescription = t.label)
+                            }
+                        },
                         label = { Text(t.label, style = MaterialTheme.typography.labelSmall) },
                     )
                 }
@@ -77,10 +127,32 @@ fun MainScaffold(container: AppContainer) {
         },
     ) { padding ->
         when (tab) {
-            MainTab.Projects -> ProjectsScreen(container, padding, onOpenChat = { tab = MainTab.Chat })
-            MainTab.Chat -> ChatScreen(container, padding)
-            MainTab.Flow -> FlowScreen(container, padding, workspace)
-            MainTab.Diffs -> DiffsScreen(container, padding, workspace)
+            MainTab.Projects -> ProjectsScreen(
+                container = container,
+                padding = padding,
+                onOpenTab = { target -> tab = target },
+            )
+            MainTab.Chat -> ChatScreen(
+                container = container,
+                padding = padding,
+                draftSeed = chatDraftSeed,
+                onConsumeDraftSeed = { chatDraftSeed = null },
+            )
+            MainTab.Flow -> FlowScreen(
+                container = container,
+                padding = padding,
+                workspace = workspace,
+                onOpenChat = { tab = MainTab.Chat },
+            )
+            MainTab.Diffs -> DiffsScreen(
+                container = container,
+                padding = padding,
+                workspace = workspace,
+                onAskInChat = { prompt ->
+                    chatDraftSeed = prompt
+                    tab = MainTab.Chat
+                },
+            )
         }
     }
 }
