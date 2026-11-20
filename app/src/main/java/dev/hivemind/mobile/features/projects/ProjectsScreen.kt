@@ -275,7 +275,7 @@ fun ProjectsScreen(
             text = {
                 Text(
                     if (relayMode) "Você voltará para a lista de IDEs vinculadas à sua conta."
-                    else "O pareamento local será removido e você precisará escanear o QR novamente.",
+                    else "O pareamento e as chaves deste aparelho serão apagados. Para voltar, escaneie o QR novo da IDE.",
                     color = TextDim,
                 )
             },

@@ -1,5 +1,10 @@
 package dev.hivemind.mobile.core.api
 
+import android.util.Log
+import dev.hivemind.mobile.core.lan.HttpTransport
+import dev.hivemind.mobile.core.lan.LanSession
+import dev.hivemind.mobile.core.lan.PlainHttp
+import dev.hivemind.mobile.core.lan.WireRequest
 import dev.hivemind.mobile.core.models.AutoReviewStatus
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.core.models.Health
@@ -9,10 +14,9 @@ import dev.hivemind.mobile.core.models.ProjectPullRequest
 import dev.hivemind.mobile.core.models.ProjectSummary
 import dev.hivemind.mobile.core.models.SessionDetail
 import dev.hivemind.mobile.core.models.WorkspaceSessionsSummary
-import java.net.URLDecoder
+import dev.hivemind.mobile.core.relay.Redact
+import java.io.IOException
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -21,15 +25,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 
 /** Erro de API do bridge (mensagem amigável do host). */
-class ApiException(message: String, val status: Int? = null) : Exception(message)
-
-// --- Payloads ---
+open class ApiException(
+    message: String,
+    val status: Int? = null,
+    val code: String? = null,
+) : Exception(message)
 
 @Serializable
 data class ProjectsResponse(val projects: List<ProjectSummary> = emptyList())
@@ -79,78 +81,43 @@ data class ResolveRequest(val approvalId: String, val approved: Boolean)
 @Serializable
 data class PollRequest(val workspace: String)
 
-// --- Parser do QR hivemind://pair ---
-
-object PairingParser {
-    /** Decodifica hivemind://pair?urls=...&token=...&host=... → (urls, token, host). */
-    fun parse(raw: String): Triple<List<String>, String, String>? {
-        val text = raw.trim()
-        if (!text.startsWith("hivemind://pair")) return null
-        val query = text.substringAfter("?", "")
-        if (query.isEmpty()) return null
-        val params = query.split("&").mapNotNull { part ->
-            val idx = part.indexOf('=')
-            if (idx <= 0) return@mapNotNull null
-            val key = URLDecoder.decode(part.substring(0, idx), "UTF-8")
-            val value = URLDecoder.decode(part.substring(idx + 1), "UTF-8")
-            key to value
-        }.toMap()
-        val urls = params["urls"]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
-        val token = params["token"].orEmpty()
-        if (urls.isEmpty() || token.isEmpty()) return null
-        return Triple(urls, token, params["host"].orEmpty())
-    }
-}
-
-// --- Cliente HTTP do bridge ---
-
-class ApiClient(private val json: Json) {
-
-    private val mediaType = "application/json; charset=utf-8".toMediaType()
-
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
+/** Cliente HTTP do bridge. Na LAN o corpo é um quadro; Bearer em claro não autentica. */
+class ApiClient(
+    private val json: Json,
+    private val http: HttpTransport = PlainHttp(),
+) {
     @Volatile
     var baseUrl: String = ""
 
+    /** Marcador do túnel relay. O token LAN não fica neste campo. */
     @Volatile
     var token: String = ""
+
+    @Volatile
+    var lanSession: LanSession? = null
 
     /** Quando preenchido, o plano de dados vai pelo túnel cifrado do relay. */
     @Volatile
     var tunnel: BridgeTunnel? = null
 
-    val isConfigured: Boolean get() = tunnel != null || (baseUrl.isNotBlank() && token.isNotBlank())
+    val isConfigured: Boolean get() = tunnel != null || (baseUrl.isNotBlank() && lanSession != null)
 
-    /** Testa a saúde de uma URL candidata (usado no pareamento com fallback). */
-    suspend fun healthAt(url: String, token: String): Health {
-        val req = Request.Builder()
-            .url(url.trimEnd('/') + "/api/v1/health")
-            .header("Authorization", "Bearer $token")
-            .get()
-            .build()
-        return withContext(Dispatchers.IO) {
-            try {
-                http.newCall(req).execute().use { resp ->
-                    val text = resp.body?.string().orEmpty()
-                    if (!resp.isSuccessful) throw ApiException("HTTP ${resp.code}", resp.code)
-                    json.decodeFromString<Health>(text)
-                }
-            } catch (e: ApiException) {
-                Log.w("HiveMindMobile", "healthAt($url): ${e.message}")
-                throw e
-            } catch (e: java.io.IOException) {
-                Log.w("HiveMindMobile", "healthAt($url): falha de rede: ${e.message}")
-                throw ApiException("falha de rede: ${e.message}", null)
-            }
+    /** Testa a saúde de uma URL candidata. `/health` não exige quadro nem Bearer. */
+    suspend fun healthAt(url: String): Health = withContext(Dispatchers.IO) {
+        try {
+            val resp = http.execute(WireRequest("GET", url.trimEnd('/') + "/api/v1/health"))
+            if (resp.status !in 200..299) throw ApiException("HTTP ${resp.status}", resp.status)
+            json.decodeFromString(resp.body.ifBlank { "{}" })
+        } catch (e: ApiException) {
+            Log.w("HiveMindMobile", Redact.clean("healthAt($url): ${e.message}"))
+            throw e
+        } catch (e: IOException) {
+            Log.w("HiveMindMobile", Redact.clean("healthAt($url): falha de rede: ${e.message}"))
+            throw ApiException("falha de rede: ${e.message}", null)
         }
     }
 
-    suspend fun health(): Health = get("/api/v1/health")
+    suspend fun health(): Health = if (tunnel != null) get("/api/v1/health") else healthAt(baseUrl)
 
     suspend fun projects(): List<ProjectSummary> = get<ProjectsResponse>("/api/v1/projects").projects
 
@@ -187,8 +154,6 @@ class ApiClient(private val json: Json) {
     suspend fun autoreviewPoll(workspace: String): AutoReviewStatus =
         post("/api/v1/autoreview/poll", PollRequest(workspace))
 
-    // --- internos ---
-
     private fun buildUrl(path: String, query: Map<String, String?>): String {
         val q = query.filterValues { !it.isNullOrBlank() }
             .map { (k, v) -> "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v!!, "UTF-8")}" }
@@ -196,27 +161,23 @@ class ApiClient(private val json: Json) {
         return baseUrl.trimEnd('/') + path + sep
     }
 
-    private fun authed(builder: Request.Builder) {
-        builder.header("Authorization", "Bearer $token")
-    }
-
     private suspend inline fun <reified T> get(path: String, query: Map<String, String?> = emptyMap()): T {
         val tun = tunnel
         if (tun != null) return tunnelCall(tun, "GET", path, query, null)
-        val req = Request.Builder().url(buildUrl(path, query)).get()
-        authed(req)
-        return execute(req.build())
+        return lanCall("GET", buildUrl(path, query), null)
     }
 
     private suspend inline fun <reified T, reified B : Any> post(path: String, body: B): T {
         val jsonBody = json.encodeToString(body)
         val tun = tunnel
         if (tun != null) return tunnelCall(tun, "POST", path, emptyMap(), jsonBody)
-        val req = Request.Builder()
-            .url(buildUrl(path, emptyMap()))
-            .post(jsonBody.toRequestBody(mediaType))
-        authed(req)
-        return execute(req.build())
+        return lanCall("POST", buildUrl(path, emptyMap()), jsonBody)
+    }
+
+    private suspend inline fun <reified T> lanCall(method: String, url: String, body: String?): T {
+        val session = lanSession ?: throw ApiException("sem pareamento")
+        val text = withContext(Dispatchers.IO) { session.call(method, url, body) }
+        return json.decodeFromString(if (text.isBlank()) "{}" else text)
     }
 
     private suspend inline fun <reified T> tunnelCall(
@@ -248,17 +209,6 @@ class ApiClient(private val json: Json) {
             is JsonPrimitive -> err.contentOrNull
             is JsonObject -> err["message"]?.jsonPrimitive?.contentOrNull
             else -> null
-        }
-    }
-
-    private suspend inline fun <reified T> execute(req: Request): T = withContext(Dispatchers.IO) {
-        http.newCall(req).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                throw ApiException(errorMessage(text) ?: "HTTP ${resp.code}", resp.code)
-            }
-            if (text.isBlank()) return@withContext json.decodeFromString<T>("{}")
-            json.decodeFromString<T>(text)
         }
     }
 }

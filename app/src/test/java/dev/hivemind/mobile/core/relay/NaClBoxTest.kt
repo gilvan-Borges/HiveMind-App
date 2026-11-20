@@ -22,6 +22,7 @@ class NaClBoxTest {
 
         val plain = NaClBox.open(bobPriv, alicePub, sealed)
         assertArrayEquals("hive-mind-relay".toByteArray(), plain)
+        assertArrayEquals(alicePub, NaClBox.publicFromPrivate(alicePriv))
     }
 
     @Test
