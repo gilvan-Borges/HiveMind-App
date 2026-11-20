@@ -524,7 +524,10 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                     }
                 },
                 enabled = !busy,
-                colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SteelBlue,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .weight(1f)
@@ -960,7 +963,9 @@ private fun Composer(
                             enabled = !sending && (text.isNotBlank() || images.isNotEmpty()),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = SteelBlue,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
                                 disabledContainerColor = ObsidianSurface,
+                                disabledContentColor = TextDim,
                             ),
                             modifier = Modifier.size(48.dp),
                         ) {
@@ -1022,7 +1027,10 @@ private fun Composer(
                                 }
                             },
                             enabled = text.isNotBlank() || images.isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = SteelBlue,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .weight(1f)

@@ -146,7 +146,10 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         HiveCard(contentPadding = PaddingValues(18.dp)) {
             Button(
                 onClick = { scanning = true },
-                colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SteelBlue,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -197,7 +200,10 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                         }
                     },
                     enabled = !connecting,
-                    colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SteelBlue,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()

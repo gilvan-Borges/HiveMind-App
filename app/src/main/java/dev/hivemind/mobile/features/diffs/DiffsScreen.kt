@@ -46,6 +46,12 @@ import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.theme.ApprovalAmber
+import dev.hivemind.mobile.theme.DiffAddedBg
+import dev.hivemind.mobile.theme.DiffAddedFg
+import dev.hivemind.mobile.theme.DiffHeaderBg
+import dev.hivemind.mobile.theme.DiffHunkBg
+import dev.hivemind.mobile.theme.DiffRemovedBg
+import dev.hivemind.mobile.theme.DiffRemovedFg
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
@@ -258,10 +264,10 @@ private fun DiffViewer(
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             items(file.lines) { line ->
                 val (bg, fg) = when (line.kind) {
-                    "added" -> Color(0xFF0E2A1E) to Color(0xFF8CE0B3)
-                    "removed" -> Color(0xFF2A1214) to Color(0xFFF3A8A8)
-                    "hunk" -> Color(0xFF141C2C) to SteelBlue
-                    "header" -> Color(0xFF10151E) to TextDim
+                    "added" -> DiffAddedBg to DiffAddedFg
+                    "removed" -> DiffRemovedBg to DiffRemovedFg
+                    "hunk" -> DiffHunkBg to SteelBlue
+                    "header" -> DiffHeaderBg to TextDim
                     else -> Color.Transparent to MaterialTheme.colorScheme.onBackground
                 }
                 Row(
@@ -288,7 +294,10 @@ private fun DiffViewer(
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
                     Button(
                         onClick = onAskInChat,
-                        colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SteelBlue,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()

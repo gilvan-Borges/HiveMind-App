@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="obsidian_bg">#050505</color>
+    <color name="surface_panel">#0C0C0C</color>
     <color name="obsidian_card">#111111</color>
     <color name="obsidian_surface">#1F1F1F</color>
-    <color name="hivemind_blue">#C6A15B</color>
-    <color name="hivemind_green">#10B981</color>
-    <color name="hivemind_red">#E58C98</color>
-    <color name="hivemind_amber">#E2AE62</color>
+    <color name="brand_gold">#C6A15B</color>
+    <color name="brand_gold_strong">#E8C881</color>
+    <color name="on_primary">#090909</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_body">#E5E5E5</color>
 </resources>

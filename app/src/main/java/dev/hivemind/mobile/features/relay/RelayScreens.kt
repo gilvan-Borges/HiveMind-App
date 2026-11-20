@@ -152,7 +152,10 @@ private fun GateHome(
         HiveCard(contentPadding = PaddingValues(18.dp)) {
             Button(
                 onClick = onRemote,
-                colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SteelBlue,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -323,7 +326,10 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             Button(
                 onClick = { submit() },
                 enabled = !busy,
-                colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SteelBlue,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -430,7 +436,10 @@ private fun DeviceList(
                 ) {
                     Button(
                         onClick = onLink,
-                        colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SteelBlue,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .weight(1f)
@@ -658,7 +667,10 @@ private fun DeviceRow(
                 onOpen()
             },
             enabled = !busy,
-            colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SteelBlue,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -758,7 +770,10 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
             HiveCard(contentPadding = PaddingValues(16.dp)) {
                 Button(
                     onClick = { scanning = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SteelBlue,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -826,7 +841,10 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                         }
                     },
                     enabled = !busy && name.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = SteelBlue),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SteelBlue,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
