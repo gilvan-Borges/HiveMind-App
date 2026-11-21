@@ -131,11 +131,11 @@ class RelayController(
 
     suspend fun login(relayUrl: String, email: String, password: String) {
         val trimmedMail = email.trim()
-        if (!trimmedMail.contains("@") || trimmedMail.length > 200) {
-            throw IllegalArgumentException("e-mail inválido")
+        if (trimmedMail.length !in 3..254 || trimmedMail.any { it.isWhitespace() }) {
+            throw IllegalArgumentException("e-mail ou usuário inválido")
         }
-        if (password.length !in 10..200) {
-            throw IllegalArgumentException("a senha precisa ter entre 10 e 200 caracteres")
+        if (password.length !in 8..200) {
+            throw IllegalArgumentException("a senha precisa ter entre 8 e 200 caracteres")
         }
         val base = RelayUrls.normalize(relayUrl)
         val resp = http.login(base, trimmedMail, password)
@@ -352,8 +352,8 @@ class RelayController(
     }
 
     suspend fun changePassword(current: String, next: String) {
-        if (next.length !in 10..200) {
-            throw IllegalArgumentException("a senha nova precisa ter entre 10 e 200 caracteres")
+        if (next.length !in 8..200) {
+            throw IllegalArgumentException("a senha nova precisa ter entre 8 e 200 caracteres")
         }
         val meta = requireMeta()
         refreshIfNeeded(force = false)
@@ -370,11 +370,15 @@ class RelayController(
     suspend fun createMember(email: String, password: String): AccountInfo {
         val meta = requireMeta()
         if (meta.role != "owner") throw RelayException("forbidden", "somente o owner cria contas", 403)
-        if (password.length !in 10..200) {
-            throw IllegalArgumentException("a senha precisa ter entre 10 e 200 caracteres")
+        val trimmed = email.trim()
+        if (trimmed.length !in 3..254 || trimmed.any { it.isWhitespace() }) {
+            throw IllegalArgumentException("e-mail ou usuário inválido")
+        }
+        if (password.length !in 8..200) {
+            throw IllegalArgumentException("a senha precisa ter entre 8 e 200 caracteres")
         }
         refreshIfNeeded(force = false)
-        return http.createMember(meta.relayUrl, requireAccess(), email.trim(), password)
+        return http.createMember(meta.relayUrl, requireAccess(), trimmed, password)
     }
 
     override suspend fun rpc(method: String, path: String, query: String, bodyJson: String?): TunnelResult {

@@ -266,7 +266,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Não há cadastro público. Use a conta criada na primeira subida do relay.",
+            "Use a conta criada no servidor do relay (HIVEMIND_SEED_EMAIL / initial-password.txt ou `hivemind-relay account set`).",
             style = MaterialTheme.typography.bodySmall,
             color = TextDim,
         )
@@ -296,12 +296,13 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("E-mail") },
+                label = { Text("E-mail ou usuário") },
+                placeholder = { Text("gilvan.b ou voce@exemplo") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
+                    keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next,
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -946,7 +947,7 @@ private fun CreateMemberDialog(onDismiss: () -> Unit, onSubmit: (String, String)
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("E-mail") },
+                    label = { Text("E-mail ou usuário") },
                     singleLine = true,
                 )
                 OutlinedTextField(
