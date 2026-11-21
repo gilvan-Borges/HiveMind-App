@@ -122,6 +122,10 @@ class PlainHttp : HttpTransport {
         if (!uri.userInfo.isNullOrBlank()) throw IOException("URL inválida")
         val host = uri.host?.trim().orEmpty()
         if (host.isEmpty() || host.contains(' ')) throw IOException("URL inválida")
+        // Cleartext só para LAN privada/Tailscale (Spec 10): host público exige HTTPS.
+        if (!CleartextGuard.isPrivateHost(host)) {
+            throw IOException("host público em HTTP é proibido: use HTTPS para $host")
+        }
         val port = if (uri.port == -1) 80 else uri.port
         val path = buildString {
             val rawPath = uri.rawPath

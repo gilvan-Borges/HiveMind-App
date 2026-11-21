@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.annotation.SuppressLint
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -64,6 +65,9 @@ class LocalNotifier(private val context: Context) {
             .setAutoCancel(true)
             .setContentIntent(contentIntent())
             .build()
+        // canPost() acima já verificou POST_NOTIFICATIONS (API 33+); em APIs
+        // anteriores a permissão runtime não existe e o notify é permitido.
+        @SuppressLint("MissingPermission")
         NotificationManagerCompat.from(context).notify("approval", info.approvalId.hashCode(), notification)
     }
 
@@ -80,6 +84,8 @@ class LocalNotifier(private val context: Context) {
             .setAutoCancel(true)
             .setContentIntent(contentIntent())
             .build()
+        // Mesmo contrato de notifyApproval: canPost() é o gate da permissão.
+        @SuppressLint("MissingPermission")
         NotificationManagerCompat.from(context).notify("finish", snapshot.laneId.hashCode(), notification)
     }
 

@@ -1,4 +1,4 @@
-package dev.hivemind.mobile.features.diffs
+﻿package dev.hivemind.mobile.features.diffs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -53,9 +53,10 @@ import dev.hivemind.mobile.theme.DiffHunkBg
 import dev.hivemind.mobile.theme.DiffRemovedBg
 import dev.hivemind.mobile.theme.DiffRemovedFg
 import dev.hivemind.mobile.theme.ErrorRed
+import dev.hivemind.mobile.theme.MonoFonts
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
@@ -88,7 +89,7 @@ fun DiffsScreen(
     suspend fun load() {
         loading = true
         error = null
-        runCatching { container.api.diffs(workspace) }
+        runCatching { container.loadDiffs(workspace) }
             .onSuccess { files = it }
             .onFailure { error = it.message }
         loading = false
@@ -102,7 +103,7 @@ fun DiffsScreen(
             file = open,
             padding = padding,
             onBack = { selected = null },
-            onAskInChat = { onAskInChat("Revise e ajuste as alterações em @${open.path}: ") },
+            onAskInChat = { onAskInChat("Revise e ajuste as alteraÃ§Ãµes em @${open.path}: ") },
         )
         return
     }
@@ -127,7 +128,7 @@ fun DiffsScreen(
                         )
                         if (!loading && error == null && files.isNotEmpty()) {
                             Text(
-                                "${files.size} arquivo(s) · +$totalAdded -$totalRemoved",
+                                "${files.size} arquivo(s) Â· +$totalAdded -$totalRemoved",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextDim,
                             )
@@ -156,7 +157,7 @@ fun DiffsScreen(
             }
             files.isEmpty() -> EmptyStatePanel(
                 title = "Workspace limpo",
-                subtitle = "Nenhuma alteração pendente de commit neste projeto.",
+                subtitle = "Nenhuma alteraÃ§Ã£o pendente de commit neste projeto.",
                 actionLabel = "Atualizar",
                 onAction = { container.appScope.launch { load() } },
             )
@@ -179,7 +180,7 @@ fun DiffsScreen(
                             Text(
                                 f.path,
                                 style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = MonoFonts,
                                 modifier = Modifier.weight(1f),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -200,7 +201,7 @@ fun DiffsScreen(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                             }
-                            Text("›", style = MaterialTheme.typography.titleMedium, color = TextDim)
+                            Text("â€º", style = MaterialTheme.typography.titleMedium, color = TextDim)
                         }
                     }
                 }
@@ -232,7 +233,7 @@ private fun DiffViewer(
                     Text(
                         file.path,
                         style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = MonoFonts,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -266,7 +267,7 @@ private fun DiffViewer(
                 val (bg, fg) = when (line.kind) {
                     "added" -> DiffAddedBg to DiffAddedFg
                     "removed" -> DiffRemovedBg to DiffRemovedFg
-                    "hunk" -> DiffHunkBg to SteelBlue
+                    "hunk" -> DiffHunkBg to BrandGold
                     "header" -> DiffHeaderBg to TextDim
                     else -> Color.Transparent to MaterialTheme.colorScheme.onBackground
                 }
@@ -280,7 +281,7 @@ private fun DiffViewer(
                     Text(
                         line.text,
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = MonoFonts,
                         color = fg,
                         softWrap = false,
                     )
@@ -295,7 +296,7 @@ private fun DiffViewer(
                     Button(
                         onClick = onAskInChat,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = SteelBlue,
+                            containerColor = BrandGold,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                         ),
                         shape = RoundedCornerShape(10.dp),
@@ -314,8 +315,8 @@ private fun DiffViewer(
 private fun statusStyle(status: String): Pair<String, Color> = when (status) {
     "A" -> "A" to SuccessGreen
     "D" -> "D" to ErrorRed
-    "R" -> "R" to SteelBlue
+    "R" -> "R" to BrandGold
     "U" -> "U" to ApprovalAmber
-    "M" -> "M" to SteelBlue
-    else -> "•" to TextDim
+    "M" -> "M" to BrandGold
+    else -> "â€¢" to TextDim
 }

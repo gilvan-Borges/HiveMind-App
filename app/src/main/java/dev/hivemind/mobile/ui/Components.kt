@@ -39,7 +39,7 @@ import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 
@@ -50,7 +50,7 @@ import dev.hivemind.mobile.theme.TextDim
 fun HiveCard(
     modifier: Modifier = Modifier,
     highlighted: Boolean = false,
-    accentColor: Color = SteelBlue,
+    accentColor: Color = BrandGold,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(14.dp),

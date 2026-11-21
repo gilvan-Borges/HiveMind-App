@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+
 package dev.hivemind.mobile.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,9 +10,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.hivemind.mobile.R
 
 // Havrus Obsidian & Brand Gold — preto profundo, grafite sólido, branco e dourado (SDD Spec 001).
 val ObsidianBg = Color(0xFF050505)
@@ -35,8 +41,6 @@ val BrandGoldSubtle = Color(0x1FC6A15B)
 val BrandGoldBorder = Color(0x40C6A15B)
 // Dourado escuro para superfície clara invertida. #C6A15B sobre branco fica abaixo de 4.5:1.
 val InverseBrand = Color(0xFF5C4716)
-// Alias de compatibilidade apontando para o acento de marca Havrus.
-val SteelBlue = BrandGold
 
 val SuccessGreen = Color(0xFF10B981)
 val ErrorRed = Color(0xFFE58C98)
@@ -77,7 +81,8 @@ private val HiveMindScheme = darkColorScheme(
     onTertiaryContainer = DiffAddedFg,
     background = ObsidianBg,
     onBackground = TextPrimary,
-    surface = ObsidianCard,
+    // Paridade com --surface-panel (#0C0C0C) da IDE (Spec 10 / constituição D2/D8).
+    surface = SurfacePanel,
     onSurface = TextPrimary,
     surfaceVariant = ObsidianSurface,
     onSurfaceVariant = TextBody,
@@ -107,17 +112,69 @@ private val HiveMindShapes = Shapes(
     large = RoundedCornerShape(18.dp),
 )
 
+// --- Tipografia: Inter (sans, variável) e JetBrains Mono, embutidas no APK
+//     para espelhar a IDE (Spec 10 §3.1.3; constituição D8). ---
+
+/** Inter variable: pesos resolvidos via eixo wght (minSdk 26 = API O). */
+val HiveFonts = FontFamily(
+    Font(
+        R.font.inter_variable,
+        weight = FontWeight.Normal,
+        variationSettings = FontVariation.Settings(FontVariation.weight(400)),
+    ),
+    Font(
+        R.font.inter_variable,
+        weight = FontWeight.Medium,
+        variationSettings = FontVariation.Settings(FontVariation.weight(500)),
+    ),
+    Font(
+        R.font.inter_variable,
+        weight = FontWeight.SemiBold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(600)),
+    ),
+    Font(
+        R.font.inter_variable,
+        weight = FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700)),
+    ),
+)
+
+/** JetBrains Mono para código, diffs, tokens e metadados Jev. */
+val MonoFonts = FontFamily(
+    Font(R.font.jetbrains_mono_regular, weight = FontWeight.Normal),
+    Font(R.font.jetbrains_mono_medium, weight = FontWeight.Medium),
+)
+
 private val HiveMindTypography = Typography(
-    headlineMedium = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
-    headlineSmall = TextStyle(fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp),
-    titleLarge = TextStyle(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp),
-    titleMedium = TextStyle(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
-    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
+    headlineMedium = TextStyle(
+        fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.4).sp, fontFamily = HiveFonts,
+    ),
+    headlineSmall = TextStyle(
+        fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.2).sp, fontFamily = HiveFonts,
+    ),
+    titleLarge = TextStyle(
+        fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.2).sp, fontFamily = HiveFonts,
+    ),
+    titleMedium = TextStyle(
+        fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
+    ),
+    titleSmall = TextStyle(
+        fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
+    ),
+    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontFamily = HiveFonts),
+    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontFamily = HiveFonts),
+    labelLarge = TextStyle(
+        fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
+    ),
+    labelMedium = TextStyle(
+        fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, fontFamily = HiveFonts,
+    ),
+    labelSmall = TextStyle(
+        fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, fontFamily = HiveFonts,
+    ),
 )
 
 @Composable

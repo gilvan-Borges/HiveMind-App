@@ -64,7 +64,7 @@ import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
@@ -182,7 +182,7 @@ private fun JiraTasksTab(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SteelBlue,
+                    focusedBorderColor = BrandGold,
                     unfocusedBorderColor = ObsidianBorder,
                     focusedContainerColor = ObsidianCard,
                     unfocusedContainerColor = ObsidianCard,
@@ -236,7 +236,7 @@ private fun JiraTasksTab(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            StatusPill(text = issue.key, color = SteelBlue)
+                            StatusPill(text = issue.key, color = BrandGold)
                             StatusPill(
                                 text = issue.status.ifBlank { issue.source },
                                 color = if (issue.status.contains("progress", true) || issue.status.contains("andamento", true)) {
@@ -279,7 +279,7 @@ private fun JiraTasksTab(
                             },
                             enabled = solving == null,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SteelBlue,
+                                containerColor = BrandGold,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                             shape = RoundedCornerShape(10.dp),
@@ -379,13 +379,13 @@ private fun PRsTab(
                 items(prs, key = { it.number }) { pr ->
                     HiveCard(
                         highlighted = pr.needsAttention || pr.reviewRequested,
-                        accentColor = if (pr.needsAttention) ApprovalAmber else SteelBlue,
+                        accentColor = if (pr.needsAttention) ApprovalAmber else BrandGold,
                     ) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            StatusPill(text = "#${pr.number}", color = SteelBlue)
+                            StatusPill(text = "#${pr.number}", color = BrandGold)
                             if (pr.needsAttention) {
                                 StatusPill(
                                     text = pr.attentionReason.ifBlank { "Atenção necessária" },
@@ -393,7 +393,7 @@ private fun PRsTab(
                                     showDot = true,
                                 )
                             } else if (pr.reviewRequested) {
-                                StatusPill(text = "Review solicitado", color = SteelBlue)
+                                StatusPill(text = "Review solicitado", color = BrandGold)
                             }
                             if (pr.isDraft) {
                                 StatusPill(text = "Draft", color = TextDim)
@@ -440,7 +440,7 @@ private fun PRsTab(
                             },
                             enabled = reviewingPr == null,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SteelBlue,
+                                containerColor = BrandGold,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                             shape = RoundedCornerShape(10.dp),
@@ -533,7 +533,7 @@ private fun AutoReviewTab(container: AppContainer, workspace: String) {
                         }
                         Spacer(Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatusPill(text = "Estado: ${st.state.ifBlank { "idle" }}", color = SteelBlue)
+                            StatusPill(text = "Estado: ${st.state.ifBlank { "idle" }}", color = BrandGold)
                             StatusPill(text = "Fila: ${st.queueCount}", color = TextDim)
                             StatusPill(text = "Revisões/h: ${st.reviewedLastHour}", color = TextDim)
                         }
@@ -542,7 +542,7 @@ private fun AutoReviewTab(container: AppContainer, workspace: String) {
                             Text(
                                 "Revisando PR #${st.activePr} — ${st.activePrTitle}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = SteelBlue,
+                                color = BrandGold,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
@@ -564,7 +564,7 @@ private fun AutoReviewTab(container: AppContainer, workspace: String) {
                             },
                             enabled = !polling,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SteelBlue,
+                                containerColor = BrandGold,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                             shape = RoundedCornerShape(10.dp),

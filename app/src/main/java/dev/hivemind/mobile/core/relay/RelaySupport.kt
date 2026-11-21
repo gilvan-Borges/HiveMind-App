@@ -101,6 +101,10 @@ object SessionSecrets {
     fun seqKey(deviceId: String): String =
         "seq_" + deviceId.filter { it.isLetterOrDigit() || it == '_' }
 
+    /** Pin TOFU da chave pública da IDE por conta+device. */
+    fun peerKeyKey(deviceId: String): String =
+        "idePub_" + deviceId.filter { it.isLetterOrDigit() || it == '_' }
+
     /** Falta menos de 30s, ou não há access token. */
     fun shouldRefresh(expiresAtMs: Long, nowMs: Long, hasAccess: Boolean): Boolean =
         !hasAccess || expiresAtMs - nowMs < 30_000L
