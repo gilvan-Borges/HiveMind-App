@@ -90,8 +90,17 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         QrScannerOverlay(
             onResult = { raw ->
                 scanning = false
-                if (dev.hivemind.mobile.core.relay.LinkCodes.parse(raw) != null) {
-                    error = "Esse QR é de acesso remoto (hivemind://link). Entre na conta do relay e vincule a IDE por lá."
+                val qrLogin = dev.hivemind.mobile.core.relay.LinkCodes.parseQrLogin(raw)
+                if (qrLogin != null) {
+                    connecting = true
+                    error = null
+                    container.appScope.launch {
+                        runCatching { container.relay.redeemQrLogin(qrLogin.first, qrLogin.second) }
+                            .onFailure { error = it.message ?: "Falha ao entrar pelo QR Code remoto." }
+                        connecting = false
+                    }
+                } else if (dev.hivemind.mobile.core.relay.LinkCodes.parse(raw) != null) {
+                    error = "Esse QR é de vínculo (hivemind://link). Na IDE clique em 'Gerar QR Code para entrar no celular' para fazer login direto."
                 } else {
                     when (val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(raw)) {
                         is PairQr.Offer -> {

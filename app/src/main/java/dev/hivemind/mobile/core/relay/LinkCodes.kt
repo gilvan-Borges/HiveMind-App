@@ -49,4 +49,23 @@ object LinkCodes {
         if (relay.isEmpty() || code.isEmpty()) return null
         return relay to code
     }
+
+    /** @return relay base e ticket de uso único de `hivemind://qr-login?relay=...&ticket=...`. */
+    fun parseQrLogin(raw: String): Pair<String, String>? {
+        val text = raw.trim()
+        if (!text.startsWith("hivemind://qr-login")) return null
+        val query = text.substringAfter("?", "")
+        if (query.isEmpty()) return null
+        val params = query.split("&").mapNotNull { part ->
+            val idx = part.indexOf('=')
+            if (idx <= 0) return@mapNotNull null
+            val key = URLDecoder.decode(part.substring(0, idx), "UTF-8")
+            val value = URLDecoder.decode(part.substring(idx + 1), "UTF-8")
+            key to value
+        }.toMap()
+        val relay = params["relay"]?.trim().orEmpty()
+        val ticket = params["ticket"]?.trim().orEmpty()
+        if (relay.isEmpty() || ticket.isEmpty()) return null
+        return relay to ticket
+    }
 }

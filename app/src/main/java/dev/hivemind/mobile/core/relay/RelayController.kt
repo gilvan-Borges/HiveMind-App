@@ -139,12 +139,26 @@ class RelayController(
         }
         val base = RelayUrls.normalize(relayUrl)
         val resp = http.login(base, trimmedMail, password)
+        adoptLoginResponse(base, trimmedMail, resp)
+    }
+
+    suspend fun redeemQrLogin(relayUrl: String, ticket: String) {
+        val cleanTicket = ticket.trim()
+        if (cleanTicket.isEmpty()) {
+            throw IllegalArgumentException("QR Code de login inválido")
+        }
+        val base = RelayUrls.normalize(relayUrl)
+        val resp = http.redeemQrLogin(base, cleanTicket)
+        adoptLoginResponse(base, "", resp)
+    }
+
+    private suspend fun adoptLoginResponse(base: String, fallbackEmail: String, resp: TokenResponse) {
         if (!resp.accessToken.startsWith("hmr_at_") || !resp.refreshToken.startsWith("hmr_rt_") || resp.account.id.isBlank()) {
             throw IllegalArgumentException("resposta de login inválida")
         }
         stopAndJoin()
         session.wipe()
-        val meta = AccountMeta(resp.account.id, resp.account.email.ifBlank { trimmedMail }, resp.account.role, base)
+        val meta = AccountMeta(resp.account.id, resp.account.email.ifBlank { fallbackEmail }, resp.account.role, base)
         vault.saveMeta(meta)
         val expires = clock() + resp.expiresIn.coerceAtLeast(1) * 1000L
         session.adoptTokens(resp.accessToken, resp.refreshToken, expires)

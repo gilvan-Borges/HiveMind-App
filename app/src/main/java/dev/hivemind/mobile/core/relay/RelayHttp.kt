@@ -48,6 +48,11 @@ class RelayHttp(
             put("newPassword", next)
         })
 
+    suspend fun redeemQrLogin(base: String, ticket: String): TokenResponse =
+        post(base, "/api/v1/auth/qr-redeem", null, buildJsonObject {
+            put("ticket", ticket)
+        })
+
     suspend fun createMember(base: String, accessToken: String, email: String, password: String): AccountInfo =
         post(base, "/api/v1/accounts", accessToken, buildJsonObject {
             put("email", email)

@@ -230,8 +230,32 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
     var email by remember(draft?.id) { mutableStateOf(draft?.email ?: "") }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var scanningQr by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
+
+    if (scanningQr) {
+        QrScannerOverlay(
+            onResult = { raw ->
+                scanningQr = false
+                val qrLogin = LinkCodes.parseQrLogin(raw)
+                if (qrLogin == null) {
+                    error = "QR inválido para login remoto. Na IDE clique em 'Gerar QR Code para entrar no celular'."
+                    return@QrScannerOverlay
+                }
+                busy = true
+                error = null
+                container.appScope.launch {
+                    runCatching { container.relay.redeemQrLogin(qrLogin.first, qrLogin.second) }
+                        .onSuccess { onLoggedIn() }
+                        .onFailure { error = it.message }
+                    busy = false
+                }
+            },
+            onClose = { scanningQr = false },
+        )
+        return
+    }
 
     fun submit() {
         if (busy) return
@@ -271,6 +295,22 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             color = TextDim,
         )
         Spacer(Modifier.height(16.dp))
+
+        Button(
+            onClick = { scanningQr = true },
+            enabled = !busy,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SteelBlue,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+        ) {
+            Text("Entrar com QR Code da IDE", fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(14.dp))
 
         HiveCard(contentPadding = PaddingValues(16.dp)) {
             val fieldColors = OutlinedTextFieldDefaults.colors(
