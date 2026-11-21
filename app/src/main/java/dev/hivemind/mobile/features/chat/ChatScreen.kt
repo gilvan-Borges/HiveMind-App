@@ -1,4 +1,4 @@
-package dev.hivemind.mobile.features.chat
+﻿package dev.hivemind.mobile.features.chat
 
 import android.content.Context
 import android.net.Uri
@@ -90,15 +90,18 @@ import dev.hivemind.mobile.core.media.prepareImage
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.LaneEventItem
 import dev.hivemind.mobile.core.models.LaneSnapshot
+import dev.hivemind.mobile.core.models.ProviderHealthView
 import dev.hivemind.mobile.core.models.RestoredMessage
 import dev.hivemind.mobile.core.models.SessionDetail
 import dev.hivemind.mobile.core.models.SessionSummary
 import dev.hivemind.mobile.theme.ApprovalAmber
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.ErrorRed
+import dev.hivemind.mobile.theme.MonoFonts
+import dev.hivemind.mobile.theme.InfoBlue
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.SteelBlue
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
@@ -107,17 +110,21 @@ import dev.hivemind.mobile.ui.HiveCard
 import dev.hivemind.mobile.ui.StatusPill
 import kotlinx.coroutines.launch
 
+// Modos aceitos pelo bridge (ide/internal/remote/server.go isAllowedRunMode).
 private val RunModes = listOf(
     "auto" to "Auto",
     "direct" to "Direto",
     "plan" to "Planejar",
+    "plan:sdd" to "SDD",
+    "plan:sdd-jira" to "SDD + Jira",
     "squad" to "Squad",
+    "resident" to "Residente",
 )
 
 private val StarterPrompts = listOf(
     "Analisar arquitetura do projeto",
-    "Resumir últimas alterações",
-    "Encontrar bugs ou pendências",
+    "Resumir Ãºltimas alteraÃ§Ãµes",
+    "Encontrar bugs ou pendÃªncias",
 )
 
 sealed class ChatDisplayItem {
@@ -127,12 +134,20 @@ sealed class ChatDisplayItem {
     data class ErrorItem(val text: String) : ChatDisplayItem()
     data class HandoffItem(val label: String) : ChatDisplayItem()
     data class FinishItem(val text: String, val tokens: Long) : ChatDisplayItem()
+    data class RouteBadge(val provider: String, val model: String, val tier: String, val estimatedMicroUsd: Long) : ChatDisplayItem()
+    data class FailoverItem(
+        val fromProvider: String,
+        val fromModel: String,
+        val provider: String,
+        val model: String,
+        val reasons: List<String>,
+    ) : ChatDisplayItem()
     data class OtherItem(val text: String) : ChatDisplayItem()
 }
 
 /**
  * Agrupa chunks consecutivos de texto do mesmo autor e chamadas repetidas da mesma ferramenta
- * (Law of Chunking + Miller's Law) para leitura rápida no celular.
+ * (Law of Chunking + Miller's Law) para leitura rÃ¡pida no celular.
  */
 fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
     val out = mutableListOf<ChatDisplayItem>()
@@ -143,7 +158,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 if (e.text.isEmpty()) continue
                 val authorLabel = e.label.ifBlank { e.author }.ifBlank { "Equipe" }
                 val isUser = e.author.equals("user", ignoreCase = true) ||
-                    e.label.equals("Você", ignoreCase = true)
+                    e.label.equals("VocÃª", ignoreCase = true)
                 val prev = out.lastOrNull() as? ChatDisplayItem.TextBubble
                 if (prev != null && prev.authorLabel == authorLabel && prev.isUser == isUser) {
                     out[out.lastIndex] = prev.copy(text = prev.text + e.text)
@@ -152,7 +167,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 }
             }
             "stage" -> {
-                val stage = e.stage.ifBlank { "—" }
+                val stage = e.stage.ifBlank { "â€”" }
                 val prev = out.lastOrNull() as? ChatDisplayItem.StageBadge
                 if (prev?.stage != stage) {
                     out += ChatDisplayItem.StageBadge(stage)
@@ -169,7 +184,18 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
             }
             "error" -> out += ChatDisplayItem.ErrorItem(e.text)
             "handoff" -> out += ChatDisplayItem.HandoffItem(e.label.ifBlank { "Handoff" })
-            "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "Execução concluída." }, e.tokens)
+            "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "ExecuÃ§Ã£o concluÃ­da." }, e.tokens)
+            "model_route" -> out += ChatDisplayItem.RouteBadge(e.provider, e.model, e.tier, e.estimatedMicroUsd)
+            "provider_failover" -> out += ChatDisplayItem.FailoverItem(
+                fromProvider = e.fromProvider,
+                fromModel = e.fromModel,
+                provider = e.provider,
+                model = e.model,
+                reasons = e.reasons,
+            )
+            "provider_exhausted" -> out += ChatDisplayItem.ErrorItem(
+                e.text.ifBlank { "Todos os provedores de IA estÃ£o esgotados ou sem credencial." },
+            )
             else -> if (e.text.isNotBlank()) out += ChatDisplayItem.OtherItem(e.text)
         }
     }
@@ -187,11 +213,13 @@ fun ChatScreen(
     val lanesState by container.hubState.lanes.collectAsState()
     val pairing by container.hubState.pairing.collectAsState()
     val selectedLaneId by container.hubState.selectedLaneId.collectAsState()
+    val providerHealth by container.hubState.providerHealth.collectAsState()
+    val relayGap by container.hubState.relayGap.collectAsState()
 
     if (workspace == null) {
         EmptyStatePanel(
             title = "Nenhum projeto ativo",
-            subtitle = "Escolha um repositório na aba Projetos para acompanhar o chat da equipe ou enviar instruções.",
+            subtitle = "Escolha um repositÃ³rio na aba Projetos para acompanhar o chat da equipe ou enviar instruÃ§Ãµes.",
             modifier = Modifier.padding(padding),
         )
         return
@@ -228,7 +256,7 @@ fun ChatScreen(
             .padding(padding)
             .imePadding(),
     ) {
-        // Cabeçalho compacto com contexto claro (Jakob's Law + Selective Attention)
+        // CabeÃ§alho compacto com contexto claro (Jakob's Law + Selective Attention)
         Surface(color = ObsidianCard) {
             Column {
                 Row(
@@ -247,7 +275,7 @@ fun ChatScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            pairing?.host?.takeIf { it.isNotBlank() }?.let { "$it · $ws" } ?: ws,
+                            pairing?.host?.takeIf { it.isNotBlank() }?.let { "$it Â· $ws" } ?: ws,
                             style = MaterialTheme.typography.labelSmall,
                             color = TextDim,
                             maxLines = 1,
@@ -257,7 +285,7 @@ fun ChatScreen(
                     if ((lane?.turnTokens ?: 0L) > 0L) {
                         StatusPill(
                             text = "${formatTokens(lane?.turnTokens ?: 0L)} tok",
-                            color = SteelBlue,
+                            color = BrandGold,
                         )
                     }
                     LaneSelector(container, lanes, lane)
@@ -267,13 +295,32 @@ fun ChatScreen(
                     ) {
                         Icon(
                             Icons.Filled.DateRange,
-                            contentDescription = "Histórico de sessões",
+                            contentDescription = "HistÃ³rico de sessÃµes",
                             tint = TextDim,
                         )
                     }
                 }
                 if (lane != null && (lane.running || lane.stage.isNotBlank())) {
                     PipelineProgressStrip(stage = lane.stage, running = lane.running)
+                }
+                ProviderHealthStrip(health = providerHealth)
+                if (relayGap != null) {
+                    Surface(
+                        onClick = { container.hubState.clearRelayGap() },
+                        color = ApprovalAmber.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                    ) {
+                        Text(
+                            "Relay perdeu eventos â€” histÃ³rico pode ter furos (${relayGap!!.reason}). Toque para dispensar.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ApprovalAmber,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        )
+                    }
                 }
                 HorizontalDivider(color = ObsidianBorder)
             }
@@ -344,8 +391,8 @@ private fun PipelineProgressStrip(stage: String, running: Boolean) {
             val current = idx == activeIdx
             val color = when {
                 current && running -> SuccessGreen
-                current -> SteelBlue
-                passed -> SteelBlue.copy(alpha = 0.65f)
+                current -> BrandGold
+                passed -> BrandGold.copy(alpha = 0.65f)
                 else -> ObsidianBorder
             }
             Surface(
@@ -376,6 +423,40 @@ private fun PipelineProgressStrip(stage: String, running: Boolean) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Badges de saÃºde dos provedores (evento `provider_health` do Jev): circuitos
+ * abertos/meio-abertos e gasto diÃ¡rio acima de 80% do teto. Sem estados, nada
+ * Ã© exibido (SDD D4: destaque sem competiÃ§Ã£o visual).
+ */
+@Composable
+private fun ProviderHealthStrip(health: List<ProviderHealthView>) {
+    if (health.isEmpty()) return
+    val alerts = health.mapNotNull { p ->
+        when {
+            p.state.equals("open", true) -> p to ErrorRed
+            p.state.equals("half_open", true) -> p to ApprovalAmber
+            p.dailyCapMicroUsd > 0 && p.dailySpentMicroUsd >= (p.dailyCapMicroUsd * 4) / 5 -> p to ApprovalAmber
+            else -> null
+        }
+    }
+    if (alerts.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        alerts.take(3).forEach { (p, color) ->
+            val label = when {
+                p.state.equals("open", true) -> "${p.provider} Â· circuito aberto"
+                p.state.equals("half_open", true) -> "${p.provider} Â· meio-aberto"
+                else -> "${p.provider} Â· gasto diÃ¡rio ${formatMicroUsd(p.dailySpentMicroUsd)}"
+            }
+            StatusPill(text = label, color = color, showDot = true)
         }
     }
 }
@@ -414,7 +495,7 @@ private fun LaneSelector(
                     color = if (running) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
-                Text("▾", style = MaterialTheme.typography.labelSmall, color = TextDim)
+                Text("â–¾", style = MaterialTheme.typography.labelSmall, color = TextDim)
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -422,7 +503,7 @@ private fun LaneSelector(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "${l.teamName.ifBlank { l.laneId }} ${if (l.running) "• rodando" else ""}",
+                            "${l.teamName.ifBlank { l.laneId }} ${if (l.running) "â€¢ rodando" else ""}",
                             color = if (l.running) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                         )
                     },
@@ -472,9 +553,9 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusPill(text = "Aprovação pendente", color = ApprovalAmber, showDot = true)
+            StatusPill(text = "AprovaÃ§Ã£o pendente", color = ApprovalAmber, showDot = true)
             Text(
-                approval.label.ifBlank { "Permissão necessária" },
+                approval.label.ifBlank { "PermissÃ£o necessÃ¡ria" },
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -525,7 +606,7 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                 },
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SteelBlue,
+                    containerColor = BrandGold,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(10.dp),
@@ -601,9 +682,9 @@ private fun ChatLog(
                     }
                 },
                 containerColor = ObsidianSurface,
-                contentColor = SteelBlue,
+                contentColor = BrandGold,
             ) {
-                Text("↓", fontWeight = FontWeight.Bold)
+                Text("â†“", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -626,12 +707,12 @@ private fun StarterEmptyChat(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Pronto para começar",
+                "Pronto para comeÃ§ar",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Envie uma instrução abaixo ou toque em uma sugestão para iniciar a equipe:",
+                "Envie uma instruÃ§Ã£o abaixo ou toque em uma sugestÃ£o para iniciar a equipe:",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextDim,
             )
@@ -651,7 +732,7 @@ private fun StarterEmptyChat(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(prompt, style = MaterialTheme.typography.labelMedium, color = SteelBlue)
+                            Text(prompt, style = MaterialTheme.typography.labelMedium, color = BrandGold)
                         }
                     }
                 }
@@ -669,11 +750,11 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                 horizontalArrangement = if (item.isUser) Arrangement.End else Arrangement.Start,
             ) {
                 Surface(
-                    color = if (item.isUser) SteelBlue.copy(alpha = 0.16f) else ObsidianCard,
+                    color = if (item.isUser) BrandGold.copy(alpha = 0.16f) else ObsidianCard,
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(
                         1.dp,
-                        if (item.isUser) SteelBlue.copy(alpha = 0.40f) else ObsidianBorder,
+                        if (item.isUser) BrandGold.copy(alpha = 0.40f) else ObsidianBorder,
                     ),
                     modifier = Modifier.fillMaxWidth(0.92f),
                 ) {
@@ -684,7 +765,7 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                         Text(
                             item.authorLabel,
                             style = MaterialTheme.typography.labelSmall,
-                            color = SteelBlue,
+                            color = BrandGold,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -697,21 +778,21 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                StatusPill(text = "Estágio: ${item.stage}", color = TextDim)
+                StatusPill(text = "EstÃ¡gio: ${item.stage}", color = TextDim)
             }
         }
         is ChatDisplayItem.ToolGroup -> {
-            val label = if (item.count > 1) "${item.toolName} ×${item.count}" else item.toolName
+            val label = if (item.count > 1) "${item.toolName} Ã—${item.count}" else item.toolName
             Surface(
                 color = ObsidianSurface,
                 shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(1.dp, ObsidianBorder),
             ) {
                 Text(
-                    "⚙ $label",
+                    "âš™ $label",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextDim,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = MonoFonts,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
@@ -721,11 +802,65 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
         }
         is ChatDisplayItem.HandoffItem -> {
             Text(
-                "⇄ ${item.label}",
+                "â‡„ ${item.label}",
                 style = MaterialTheme.typography.labelSmall,
-                color = SteelBlue,
+                color = BrandGold,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
             )
+        }
+        is ChatDisplayItem.RouteBadge -> {
+            val route = listOfNotNull(
+                item.provider.takeIf { it.isNotBlank() },
+                item.model.takeIf { it.isNotBlank() },
+                item.tier.takeIf { it.isNotBlank() },
+            ).joinToString(" Â· ")
+            if (route.isNotBlank()) {
+                Text(
+                    buildString {
+                        append("â—† IA: ")
+                        append(route)
+                        if (item.estimatedMicroUsd > 0) append(" Â· ~").append(formatMicroUsd(item.estimatedMicroUsd))
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InfoBlue,
+                    fontFamily = MonoFonts,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
+        }
+        is ChatDisplayItem.FailoverItem -> {
+            val from = listOfNotNull(
+                item.fromProvider.takeIf { it.isNotBlank() },
+                item.fromModel.takeIf { it.isNotBlank() },
+            ).joinToString("/")
+            val to = listOfNotNull(
+                item.provider.takeIf { it.isNotBlank() },
+                item.model.takeIf { it.isNotBlank() },
+            ).joinToString("/")
+            Surface(
+                color = ApprovalAmber.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
+                modifier = Modifier.padding(vertical = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(
+                        "â‡„ Failover${if (from.isNotBlank() && to.isNotBlank()) ": $from â†’ $to" else ""}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ApprovalAmber,
+                        fontFamily = MonoFonts,
+                    )
+                    item.reasons.firstOrNull()?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextDim,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
         }
         is ChatDisplayItem.FinishItem -> {
             Surface(
@@ -735,7 +870,7 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    "✓ ${item.text} · ${formatTokens(item.tokens)} tok",
+                    "âœ“ ${item.text} Â· ${formatTokens(item.tokens)} tok",
                     style = MaterialTheme.typography.bodySmall,
                     color = SuccessGreen,
                     fontWeight = FontWeight.Medium,
@@ -785,9 +920,9 @@ private fun Composer(
                         images = images + prep.toInput(uri)
                         error = null
                     }
-                    ImagePrep.TooLarge -> error = "A imagem não cabe no relay (limite de 12 MiB)."
-                    ImagePrep.Unreadable -> error = "Não foi possível ler a imagem."
-                    null -> error = "Não foi possível ler a imagem."
+                    ImagePrep.TooLarge -> error = "A imagem nÃ£o cabe no relay (limite de 12 MiB)."
+                    ImagePrep.Unreadable -> error = "NÃ£o foi possÃ­vel ler a imagem."
+                    null -> error = "NÃ£o foi possÃ­vel ler a imagem."
                 }
             }
         }
@@ -844,7 +979,7 @@ private fun Composer(
                             modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                         ) {
                             Text(
-                                "Continuando sessão ${continueSessionId.take(8)}…",
+                                "Continuando sessÃ£o ${continueSessionId.take(8)}â€¦",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ApprovalAmber,
                             )
@@ -854,7 +989,7 @@ private fun Composer(
                             ) {
                                 Icon(
                                     Icons.Filled.Close,
-                                    contentDescription = "Cancelar continuação",
+                                    contentDescription = "Cancelar continuaÃ§Ã£o",
                                     tint = ApprovalAmber,
                                     modifier = Modifier.size(16.dp),
                                 )
@@ -875,8 +1010,8 @@ private fun Composer(
                             onClick = { runMode = value },
                             label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SteelBlue.copy(alpha = 0.20f),
-                                selectedLabelColor = SteelBlue,
+                                selectedContainerColor = BrandGold.copy(alpha = 0.20f),
+                                selectedLabelColor = BrandGold,
                             ),
                         )
                     }
@@ -939,11 +1074,11 @@ private fun Composer(
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
-                        placeholder = { Text("Instrução para a equipe…", color = TextDim) },
+                        placeholder = { Text("InstruÃ§Ã£o para a equipeâ€¦", color = TextDim) },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SteelBlue,
+                            focusedBorderColor = BrandGold,
                             unfocusedBorderColor = ObsidianBorder,
                             focusedContainerColor = ObsidianSurface,
                             unfocusedContainerColor = ObsidianSurface,
@@ -962,7 +1097,7 @@ private fun Composer(
                             onClick = { submitRun() },
                             enabled = !sending && (text.isNotBlank() || images.isNotEmpty()),
                             colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = SteelBlue,
+                                containerColor = BrandGold,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 disabledContainerColor = ObsidianSurface,
                                 disabledContentColor = TextDim,
@@ -1001,7 +1136,7 @@ private fun Composer(
                                 .weight(1f)
                                 .heightIn(min = 44.dp),
                         ) {
-                            Text("■ Parar", fontWeight = FontWeight.SemiBold)
+                            Text("â–  Parar", fontWeight = FontWeight.SemiBold)
                         }
                         Button(
                             onClick = {
@@ -1028,7 +1163,7 @@ private fun Composer(
                             },
                             enabled = text.isNotBlank() || images.isNotEmpty(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SteelBlue,
+                                containerColor = BrandGold,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                             shape = RoundedCornerShape(10.dp),
@@ -1066,7 +1201,7 @@ private fun SessionHistoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sessões do projeto", fontWeight = FontWeight.SemiBold) },
+        title = { Text("SessÃµes do projeto", fontWeight = FontWeight.SemiBold) },
         text = {
             when {
                 loading -> Box(
@@ -1076,7 +1211,7 @@ private fun SessionHistoryDialog(
                     CircularProgressIndicator()
                 }
                 error != null -> ErrorBanner(message = error.orEmpty())
-                sessions.isEmpty() -> Text("Nenhuma sessão salva ainda.", color = TextDim)
+                sessions.isEmpty() -> Text("Nenhuma sessÃ£o salva ainda.", color = TextDim)
                 else -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1094,7 +1229,7 @@ private fun SessionHistoryDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                "${s.updatedAt.take(16).replace('T', ' ')} · ${formatTokens(s.totalTokens)} tok",
+                                "${s.updatedAt.take(16).replace('T', ' ')} Â· ${formatTokens(s.totalTokens)} tok",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextDim,
                             )
@@ -1132,7 +1267,7 @@ private fun SessionHistoryDialog(
 private fun SessionDetailDialog(session: SessionDetail, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(session.title.ifBlank { "Sessão ${session.id.take(8)}" }) },
+        title = { Text(session.title.ifBlank { "SessÃ£o ${session.id.take(8)}" }) },
         text = {
             Column(
                 modifier = Modifier
@@ -1142,9 +1277,9 @@ private fun SessionDetailDialog(session: SessionDetail, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "Entrada ${formatTokens(session.inputTokens)} · Saída ${formatTokens(session.outputTokens)} · Total ${formatTokens(session.totalTokens)}",
+                    "Entrada ${formatTokens(session.inputTokens)} Â· SaÃ­da ${formatTokens(session.outputTokens)} Â· Total ${formatTokens(session.totalTokens)}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = SteelBlue,
+                    color = BrandGold,
                 )
                 HorizontalDivider(color = ObsidianBorder)
                 session.messages.forEach { m -> RestoredRow(m) }
@@ -1162,7 +1297,7 @@ private fun RestoredRow(m: RestoredMessage) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = when (m.kind) {
-                "user" -> SteelBlue
+                "user" -> BrandGold
                 "chief" -> SuccessGreen
                 else -> TextDim
             },
@@ -1197,4 +1332,14 @@ fun formatTokens(tokens: Long): String {
     if (tokens >= 1_000_000) return "%.1fM".format(java.util.Locale.US, tokens / 1_000_000.0)
     if (tokens >= 1_000) return "%.1fk".format(java.util.Locale.US, tokens / 1_000.0)
     return tokens.toString()
+}
+
+/** Micro-USD do Jev em formato legÃ­vel: 12_300 â†’ "$0.0123". */
+fun formatMicroUsd(microUsd: Long): String {
+    val usd = microUsd / 1_000_000.0
+    return when {
+        usd >= 1.0 -> java.util.Locale.US.let { String.format(it, "$%.2f", usd) }
+        usd >= 0.01 -> java.util.Locale.US.let { String.format(it, "$%.4f", usd) }
+        else -> java.util.Locale.US.let { String.format(it, "$%.6f", usd) }
+    }
 }

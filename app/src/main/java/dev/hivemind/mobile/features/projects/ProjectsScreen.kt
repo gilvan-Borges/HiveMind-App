@@ -56,7 +56,7 @@ import dev.hivemind.mobile.core.models.ProjectSummary
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.ConnectionBadge
@@ -309,7 +309,7 @@ private fun ProjectCard(
 ) {
     HiveCard(
         highlighted = isActive || p.pendingApprovals > 0,
-        accentColor = if (p.pendingApprovals > 0) ApprovalAmber else SteelBlue,
+        accentColor = if (p.pendingApprovals > 0) ApprovalAmber else BrandGold,
         onClick = onSelectChat,
         contentPadding = PaddingValues(14.dp),
     ) {
@@ -326,7 +326,7 @@ private fun ProjectCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (isActive) {
-                        StatusPill(text = "Ativo", color = SteelBlue)
+                        StatusPill(text = "Ativo", color = BrandGold)
                     }
                 }
             }

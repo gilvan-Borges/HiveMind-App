@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -21,15 +22,55 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    // Assinatura de release externa: nunca embutida no Git. Lê variáveis de
+    // ambiente HIVEMIND_KEYSTORE / HIVEMIND_KEYSTORE_PASSWORD / HIVEMIND_KEY_ALIAS /
+    // HIVEMIND_KEY_PASSWORD (ou as gradle properties hivemindKeystore /
+    // hivemindKeystorePassword / hivemindKeyAlias / hivemindKeyPassword).
+    // Sem keystore configurada, a release sai unsigned — nunca assina com a chave de debug.
+    val keystoreFile = providers.gradleProperty("hivemindKeystore")
+        .orElse(providers.environmentVariable("HIVEMIND_KEYSTORE"))
+        .orNull
+    val keystorePassword = providers.gradleProperty("hivemindKeystorePassword")
+        .orElse(providers.environmentVariable("HIVEMIND_KEYSTORE_PASSWORD"))
+        .orNull
+    val keyAlias = providers.gradleProperty("hivemindKeyAlias")
+        .orElse(providers.environmentVariable("HIVEMIND_KEY_ALIAS"))
+        .orNull
+    val keyPassword = providers.gradleProperty("hivemindKeyPassword")
+        .orElse(providers.environmentVariable("HIVEMIND_KEY_PASSWORD"))
+        .orNull
+
+    val hasExternalKeystore = !keystoreFile.isNullOrBlank() &&
+        !keystorePassword.isNullOrBlank() &&
+        !keyAlias.isNullOrBlank()
+
+    signingConfigs {
+        if (hasExternalKeystore) {
+            create("release") {
+                val store = rootProject.layout.projectDirectory.file(keystoreFile!!)
+                if (!store.asFile.exists()) {
+                    throw GradleException("HIVEMIND_KEYSTORE aponta para '${keystoreFile}' e o arquivo não existe")
+                }
+                storeFile = store.asFile
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword ?: keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
-            // APK instalável sem keystore dedicado (release assinada com debug key).
-            signingConfig = signingConfigs.getByName("debug")
+            // R8 + shrink de recursos (Spec 10): ofusca, corta e valida com lint.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (hasExternalKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -69,6 +110,11 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.4")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
+
+    // Cache offline Room/SQLite (Spec 10): projetos, lanes, mensagens e diffs.
+    implementation("androidx.room:room-runtime:2.7.2")
+    implementation("androidx.room:room-ktx:2.7.2")
+    ksp("androidx.room:room-compiler:2.7.2")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")

@@ -1,4 +1,4 @@
-package dev.hivemind.mobile.features.relay
+﻿package dev.hivemind.mobile.features.relay
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -75,10 +75,11 @@ import dev.hivemind.mobile.features.pairing.PairingScreen
 import dev.hivemind.mobile.features.pairing.QrScannerOverlay
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.ErrorRed
+import dev.hivemind.mobile.theme.MonoFonts
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
@@ -127,7 +128,7 @@ private fun GateHome(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        StatusPill(text = "E2E · Relay & LAN", color = SteelBlue)
+        StatusPill(text = "E2E Â· Relay & LAN", color = BrandGold)
         Spacer(Modifier.height(14.dp))
         Text(
             "HiveMind Mobile",
@@ -137,7 +138,7 @@ private fun GateHome(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Comande sua equipe de agentes pela rede local ou por um relay próprio.",
+            "Comande sua equipe de agentes pela rede local ou por um relay prÃ³prio.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextDim,
             textAlign = TextAlign.Center,
@@ -153,7 +154,7 @@ private fun GateHome(
             Button(
                 onClick = onRemote,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SteelBlue,
+                    containerColor = BrandGold,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -213,7 +214,7 @@ private fun GateHome(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            Text("›", style = MaterialTheme.typography.titleMedium, color = SteelBlue)
+                            Text("â€º", style = MaterialTheme.typography.titleMedium, color = BrandGold)
                         }
                     }
                 }
@@ -240,7 +241,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
                 scanningQr = false
                 val qrLogin = LinkCodes.parseQrLogin(raw)
                 if (qrLogin == null) {
-                    error = "QR inválido para login remoto. Na IDE clique em 'Gerar QR Code para entrar no celular'."
+                    error = "QR invÃ¡lido para login remoto. Na IDE clique em 'Gerar QR Code para entrar no celular'."
                     return@QrScannerOverlay
                 }
                 busy = true
@@ -300,7 +301,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             onClick = { scanningQr = true },
             enabled = !busy,
             colors = ButtonDefaults.buttonColors(
-                containerColor = SteelBlue,
+                containerColor = BrandGold,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
             shape = RoundedCornerShape(12.dp),
@@ -314,7 +315,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
 
         HiveCard(contentPadding = PaddingValues(16.dp)) {
             val fieldColors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SteelBlue,
+                focusedBorderColor = BrandGold,
                 unfocusedBorderColor = ObsidianBorder,
                 focusedContainerColor = ObsidianSurface,
                 unfocusedContainerColor = ObsidianSurface,
@@ -336,7 +337,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("E-mail ou usuário") },
+                label = { Text("E-mail ou usuÃ¡rio") },
                 placeholder = { Text("gilvan.b ou voce@exemplo") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -368,7 +369,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
                 onClick = { submit() },
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SteelBlue,
+                    containerColor = BrandGold,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -454,7 +455,7 @@ private fun DeviceList(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" · "),
+                            listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" Â· "),
                             style = MaterialTheme.typography.labelSmall,
                             color = TextDim,
                             maxLines = 1,
@@ -463,7 +464,7 @@ private fun DeviceList(
                     }
                     if (conn is ConnState.Connecting || conn is ConnState.Reconnecting) {
                         StatusPill(
-                            text = if (conn is ConnState.Reconnecting) "Reconectando…" else "Conectando…",
+                            text = if (conn is ConnState.Reconnecting) "Reconectandoâ€¦" else "Conectandoâ€¦",
                             color = ApprovalAmber,
                             showDot = true,
                         )
@@ -478,7 +479,7 @@ private fun DeviceList(
                     Button(
                         onClick = onLink,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = SteelBlue,
+                            containerColor = BrandGold,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                         ),
                         shape = RoundedCornerShape(10.dp),
@@ -512,7 +513,7 @@ private fun DeviceList(
         if (devices.isEmpty()) {
             EmptyStatePanel(
                 title = "Nenhuma IDE vinculada",
-                subtitle = "Gere um código na IDE (Acesso remoto) ou escaneie o QR para começar.",
+                subtitle = "Gere um cÃ³digo na IDE (Acesso remoto) ou escaneie o QR para comeÃ§ar.",
                 actionLabel = "Vincular primeira IDE",
                 onAction = onLink,
                 secondaryLabel = "Pareamento na rede local",
@@ -560,7 +561,7 @@ private fun DeviceList(
         AlertDialog(
             onDismissRequest = { revoke = null },
             title = { Text("Revogar ${target.name.ifBlank { "IDE" }}?") },
-            text = { Text("O PC deixa de atender este aparelho até um vínculo novo.") },
+            text = { Text("O PC deixa de atender este aparelho atÃ© um vÃ­nculo novo.") },
             confirmButton = {
                 TextButton(onClick = {
                     revoke = null
@@ -583,7 +584,7 @@ private fun DeviceList(
                     accounts.forEach { account ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                account.email + if (account.id == active?.id) " · atual" else "",
+                                account.email + if (account.id == active?.id) " Â· atual" else "",
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
@@ -684,11 +685,11 @@ private fun DeviceRow(
             )
             Box {
                 IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "Ações", tint = TextDim)
+                    Icon(Icons.Filled.MoreVert, contentDescription = "AÃ§Ãµes", tint = TextDim)
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Revogar vínculo", color = ErrorRed) },
+                        text = { Text("Revogar vÃ­nculo", color = ErrorRed) },
                         onClick = {
                             menuOpen = false
                             onRevoke()
@@ -709,7 +710,7 @@ private fun DeviceRow(
             },
             enabled = !busy,
             colors = ButtonDefaults.buttonColors(
-                containerColor = SteelBlue,
+                containerColor = BrandGold,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
             shape = RoundedCornerShape(10.dp),
@@ -749,9 +750,9 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 val parsed = LinkCodes.parse(raw)
                 if (parsed == null) {
                     error = if (raw.trim().startsWith("hivemind://pair")) {
-                        "Esse QR é de pareamento LAN (hivemind://pair)."
+                        "Esse QR Ã© de pareamento LAN (hivemind://pair)."
                     } else {
-                        "QR de vínculo inválido."
+                        "QR de vÃ­nculo invÃ¡lido."
                     }
                 } else {
                     busy = true
@@ -788,20 +789,20 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Os dois lados precisam estar na mesma conta. O código vale 10 minutos e é de uso único.",
+            "Os dois lados precisam estar na mesma conta. O cÃ³digo vale 10 minutos e Ã© de uso Ãºnico.",
             color = TextDim,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(14.dp))
 
         TabRow(selectedTabIndex = modeTab, containerColor = ObsidianCard) {
-            Tab(selected = modeTab == 0, onClick = { modeTab = 0 }, text = { Text("Ler QR / Código") })
+            Tab(selected = modeTab == 0, onClick = { modeTab = 0 }, text = { Text("Ler QR / CÃ³digo") })
             Tab(selected = modeTab == 1, onClick = { modeTab = 1 }, text = { Text("Gerar no App") })
         }
         Spacer(Modifier.height(14.dp))
 
         val fieldColors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = SteelBlue,
+            focusedBorderColor = BrandGold,
             unfocusedBorderColor = ObsidianBorder,
             focusedContainerColor = ObsidianSurface,
             unfocusedContainerColor = ObsidianSurface,
@@ -812,7 +813,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 Button(
                     onClick = { scanning = true },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SteelBlue,
+                        containerColor = BrandGold,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                     shape = RoundedCornerShape(12.dp),
@@ -828,7 +829,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text("Ou digite o código (ABCD-EFGH-JK)") },
+                    label = { Text("Ou digite o cÃ³digo (ABCD-EFGH-JK)") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors,
@@ -854,12 +855,12 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .heightIn(min = 44.dp),
                 ) {
-                    Text("Confirmar código")
+                    Text("Confirmar cÃ³digo")
                 }
             }
         } else {
             HiveCard(contentPadding = PaddingValues(16.dp)) {
-                Text("Gere um código para digitar na IDE", style = MaterialTheme.typography.titleSmall)
+                Text("Gere um cÃ³digo para digitar na IDE", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = name,
@@ -883,7 +884,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                     },
                     enabled = !busy && name.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SteelBlue,
+                        containerColor = BrandGold,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                     shape = RoundedCornerShape(10.dp),
@@ -891,7 +892,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .heightIn(min = 46.dp),
                 ) {
-                    Text("Gerar código", fontWeight = FontWeight.SemiBold)
+                    Text("Gerar cÃ³digo", fontWeight = FontWeight.SemiBold)
                 }
                 if (link != null) {
                     Spacer(Modifier.height(14.dp))
@@ -901,8 +902,8 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                         LinkCodes.format(link!!.code),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = SteelBlue,
+                        fontFamily = MonoFonts,
+                        color = BrandGold,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(link!!.uri, style = MaterialTheme.typography.bodySmall, color = TextDim)
@@ -911,7 +912,7 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                     StatusPill(
                         text = when (status) {
                             "ready" -> "IDE vinculada"
-                            "expired" -> "Código expirado"
+                            "expired" -> "CÃ³digo expirado"
                             else -> "Aguardando a IDE"
                         },
                         color = when (status) {
@@ -980,14 +981,14 @@ private fun CreateMemberDialog(onDismiss: () -> Unit, onSubmit: (String, String)
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Só o owner cria contas. A senha não fica gravada neste aparelho.",
+                    "SÃ³ o owner cria contas. A senha nÃ£o fica gravada neste aparelho.",
                     color = TextDim,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("E-mail ou usuário") },
+                    label = { Text("E-mail ou usuÃ¡rio") },
                     singleLine = true,
                 )
                 OutlinedTextField(

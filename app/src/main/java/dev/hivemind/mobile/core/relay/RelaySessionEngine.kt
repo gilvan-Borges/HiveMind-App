@@ -22,6 +22,9 @@ sealed interface FrameEffect {
         val seq: Long,
     ) : FrameEffect
     data class Peer(val publicKey: String, val role: String) : FrameEffect
+
+    /** `peer_presence` (Spec 09): a IDE ficou online/offline no relay, sem esperar o polling. */
+    data class Presence(val online: Boolean, val role: String) : FrameEffect
     data class RemoteError(val id: String, val code: String, val message: String) : FrameEffect
     data object Ignored : FrameEffect
 }
@@ -88,6 +91,13 @@ class RelaySessionEngine(
                 val payload = env.obj("payload")
                 FrameEffect.Peer(
                     publicKey = payload?.str("publicKey").orEmpty(),
+                    role = payload?.str("role").orEmpty(),
+                )
+            }
+            "peer_presence" -> {
+                val payload = env.obj("payload")
+                FrameEffect.Presence(
+                    online = payload?.bool("online") == true,
                     role = payload?.str("role").orEmpty(),
                 )
             }
