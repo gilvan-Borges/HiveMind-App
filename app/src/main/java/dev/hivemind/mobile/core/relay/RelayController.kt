@@ -113,7 +113,14 @@ class RelayController(
         val id = vault.activeAccountId() ?: return
         val meta = accountsFlow.value.find { it.id == id } ?: return
         session.load(id, vault)
-        if (session.refreshToken.isNullOrBlank()) {
+        val access = session.accessToken
+        val refresh = session.refreshToken
+        // Mesma política do login/refresh: tokens sem prefixo não voltam à rede.
+        if (refresh.isNullOrBlank() ||
+            !refresh.startsWith("hmr_rt_") ||
+            (access != null && !access.startsWith("hmr_at_"))
+        ) {
+            session.wipe()
             draftFlow.value = meta
             loggedInFlow.value = false
             activeFlow.value = null
