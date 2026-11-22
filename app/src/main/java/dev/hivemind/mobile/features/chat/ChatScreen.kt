@@ -1,4 +1,4 @@
-package dev.hivemind.mobile.features.chat
+﻿package dev.hivemind.mobile.features.chat
 
 import android.content.Context
 import android.net.Uri
@@ -111,7 +111,7 @@ import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.InfoBlue
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.SurfaceInput
 import dev.hivemind.mobile.theme.SurfacePanel
@@ -144,6 +144,14 @@ sealed class ChatDisplayItem {
     data class ErrorItem(val text: String) : ChatDisplayItem()
     data class HandoffItem(val label: String) : ChatDisplayItem()
     data class FinishItem(val text: String, val tokens: Long) : ChatDisplayItem()
+    data class RouteBadge(val provider: String, val model: String, val tier: String, val estimatedMicroUsd: Long) : ChatDisplayItem()
+    data class FailoverItem(
+        val fromProvider: String,
+        val fromModel: String,
+        val provider: String,
+        val model: String,
+        val reasons: List<String>,
+    ) : ChatDisplayItem()
     data class OtherItem(val text: String) : ChatDisplayItem()
 }
 
@@ -187,6 +195,17 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
             "error" -> out += ChatDisplayItem.ErrorItem(e.text)
             "handoff" -> out += ChatDisplayItem.HandoffItem(e.label.ifBlank { "Handoff" })
             "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "Execução concluída." }, e.tokens)
+            "model_route" -> out += ChatDisplayItem.RouteBadge(e.provider, e.model, e.tier, e.estimatedMicroUsd)
+            "provider_failover" -> out += ChatDisplayItem.FailoverItem(
+                fromProvider = e.fromProvider,
+                fromModel = e.fromModel,
+                provider = e.provider,
+                model = e.model,
+                reasons = e.reasons,
+            )
+            "provider_exhausted" -> out += ChatDisplayItem.ErrorItem(
+                e.text.ifBlank { "Todos os provedores de IA estão esgotados ou sem credencial." },
+            )
             else -> if (e.text.isNotBlank()) out += ChatDisplayItem.OtherItem(e.text)
         }
     }
@@ -396,8 +415,8 @@ private fun PipelineProgressStrip(stage: String, running: Boolean) {
             val current = idx == activeIdx
             val color = when {
                 current && running -> SuccessGreen
-                current -> SteelBlue
-                passed -> SteelBlue.copy(alpha = 0.65f)
+                current -> InfoBlue
+                passed -> InfoBlue.copy(alpha = 0.65f)
                 else -> ObsidianBorder
             }
             Surface(
@@ -577,7 +596,7 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                 },
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SteelBlue,
+                    containerColor = InfoBlue,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(10.dp),
@@ -653,7 +672,7 @@ private fun ChatLog(
                     }
                 },
                 containerColor = ObsidianSurface,
-                contentColor = SteelBlue,
+                contentColor = InfoBlue,
             ) {
                 Text("↓", fontWeight = FontWeight.Bold)
             }
@@ -895,6 +914,56 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                 }
             }
         }
+        is ChatDisplayItem.RouteBadge -> {
+            val route = listOfNotNull(
+                item.provider.takeIf { it.isNotBlank() },
+                item.model.takeIf { it.isNotBlank() },
+                item.tier.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
+            if (route.isNotBlank()) {
+                Text(
+                    buildString {
+                        append("IA: ")
+                        append(route)
+                        if (item.estimatedMicroUsd > 0) append(" · ~").append(formatMicroUsd(item.estimatedMicroUsd))
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InfoBlue,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
+        }
+        is ChatDisplayItem.FailoverItem -> {
+            val from = listOfNotNull(
+                item.fromProvider.takeIf { it.isNotBlank() },
+                item.fromModel.takeIf { it.isNotBlank() },
+            ).joinToString("/")
+            val to = listOfNotNull(
+                item.provider.takeIf { it.isNotBlank() },
+                item.model.takeIf { it.isNotBlank() },
+            ).joinToString("/")
+            Surface(
+                color = BrandGold.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, BrandGold.copy(alpha = 0.35f)),
+                modifier = Modifier.padding(vertical = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(
+                        "Failover: ${from.ifBlank { "provedor" }} -> ${to.ifBlank { "próximo" }}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BrandGold,
+                    )
+                    if (item.reasons.isNotEmpty()) {
+                        Text(
+                            item.reasons.joinToString("; "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextDim,
+                        )
+                    }
+                }
+            }
+        }
         is ChatDisplayItem.OtherItem -> {
             Text(item.text, style = MaterialTheme.typography.bodySmall, color = TextDim)
         }
@@ -952,12 +1021,14 @@ private fun Composer(
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         container.appScope.launch {
             val laneId = lane?.laneId ?: "lane-mobile"
+            val activeSessionId = continueSessionId?.takeIf { it.isNotBlank() }
+                ?: lane?.sessionId?.takeIf { it.isNotBlank() }
             runCatching {
                 container.startRun(
                     laneId = laneId,
                     workspace = workspace,
                     objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." },
-                    sessionId = continueSessionId,
+                    sessionId = activeSessionId,
                     runMode = runMode,
                     images = images,
                 )
@@ -1336,7 +1407,7 @@ private fun SessionDetailDialog(session: SessionDetail, onDismiss: () -> Unit) {
                 Text(
                     "Entrada ${formatTokens(session.inputTokens)} · Saída ${formatTokens(session.outputTokens)} · Total ${formatTokens(session.totalTokens)}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = SteelBlue,
+                    color = InfoBlue,
                 )
                 HorizontalDivider(color = ObsidianBorder)
                 session.messages.forEach { m -> RestoredRow(m) }
@@ -1354,7 +1425,7 @@ private fun RestoredRow(m: RestoredMessage) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = when (m.kind) {
-                "user" -> SteelBlue
+                "user" -> InfoBlue
                 "chief" -> SuccessGreen
                 else -> TextDim
             },
@@ -1389,4 +1460,14 @@ fun formatTokens(tokens: Long): String {
     if (tokens >= 1_000_000) return "%.1fM".format(java.util.Locale.US, tokens / 1_000_000.0)
     if (tokens >= 1_000) return "%.1fk".format(java.util.Locale.US, tokens / 1_000.0)
     return tokens.toString()
+}
+
+/** Micro-USD do Jev em formato legível: 12_300 -> "$0.0123". */
+fun formatMicroUsd(microUsd: Long): String {
+    val usd = microUsd / 1_000_000.0
+    return when {
+        usd >= 1.0 -> java.util.Locale.US.let { String.format(it, "$%.2f", usd) }
+        usd >= 0.01 -> java.util.Locale.US.let { String.format(it, "$%.4f", usd) }
+        else -> java.util.Locale.US.let { String.format(it, "$%.6f", usd) }
+    }
 }

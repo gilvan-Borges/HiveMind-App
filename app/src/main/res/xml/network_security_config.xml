@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HiveMind-App: cleartext desligado por padrão (Spec 10 §3.1.3).
+
+  A ponta LAN (http://<IP-do-PC>:47890) não passa pela plataforma Android: o
+  transporte da LAN é HTTP/1.1 sobre socket cru (core/lan/PlainHttp.kt), onde a
+  allowlist de hosts privados é aplicada em código (CleartextGuard: loopback,
+  RFC1918 e CGNAT 100.64.0.0/10 do Tailscale). Este config fecha a porta para
+  todo o resto: HttpURLConnection, WebView e clientes de plataforma só falam
+  HTTPS, com exceção do loopback para desenvolvimento/testes.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

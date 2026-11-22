@@ -34,7 +34,39 @@ data class ApprovalInfo(
     val workspace: String = "",
     val prompt: String = "",
     val label: String = "",
+    val toolName: String = "",
+    val detail: String = "",
+    val riskTier: String = "",
     val createdAt: String = "",
+)
+
+// --- Jev: saúde e metadados de roteamento (SPEC_JEV_ORQUESTRADOR §"app") ---
+
+/** Item secreto-seguro do evento SSE `provider_health` e do campo `health` de lane events. */
+@Serializable
+data class ProviderHealthView(
+    val provider: String = "",
+    val state: String = "",
+    val reason: String = "",
+    val until: String = "",
+    val dailySpentMicroUsd: Long = 0,
+    val dailyCapMicroUsd: Long = 0,
+    val quotaRemainingPct: Double = 0.0,
+    val quotaStale: Boolean = false,
+    val hasCredential: Boolean = false,
+)
+
+/** Corpo do evento SSE `provider_health` emitido pelo hub do bridge. */
+@Serializable
+data class ProviderHealthPayload(
+    val providers: List<ProviderHealthView> = emptyList(),
+)
+
+/** Corpo do evento SSE `relay_gap`: snapshot vivo de lanes após um gap do relay. */
+@Serializable
+data class RelayGapPayload(
+    val reason: String = "",
+    val lanes: List<LaneSnapshot> = emptyList(),
 )
 
 @Serializable
@@ -46,6 +78,15 @@ data class LaneEventItem(
     val text: String = "",
     val toolName: String = "",
     val tokens: Long = 0,
+    val provider: String = "",
+    val model: String = "",
+    val fromProvider: String = "",
+    val fromModel: String = "",
+    val tier: String = "",
+    val reasons: List<String> = emptyList(),
+    val estimatedMicroUsd: Long = 0,
+    val decisionMicros: Long = 0,
+    val health: List<ProviderHealthView> = emptyList(),
     val at: String = "",
 )
 
@@ -80,11 +121,22 @@ data class OrchestratorEvent(
     val toolName: String? = null,
     val detail: String? = null,
     val approvalId: String? = null,
+    val gate: String? = null,
     val partial: Boolean = false,
     val thought: Boolean = false,
     val inputTokens: Long = 0,
     val outputTokens: Long = 0,
     val tokens: Long = 0,
+    // Metadados Jev: rota escolhida, failover, tier, custo estimado e gate (Spec 10 / SPEC_JEV).
+    val provider: String? = null,
+    val model: String? = null,
+    val fromProvider: String? = null,
+    val fromModel: String? = null,
+    val tier: String? = null,
+    val reasons: List<String> = emptyList(),
+    val estimatedMicroUsd: Long = 0,
+    val decisionMicros: Long = 0,
+    val health: List<ProviderHealthView> = emptyList(),
 )
 
 @Serializable

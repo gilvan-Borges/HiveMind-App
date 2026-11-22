@@ -13,6 +13,7 @@ import dev.hivemind.mobile.core.lan.LanRedeem
 import dev.hivemind.mobile.core.lan.LanSession
 import dev.hivemind.mobile.core.lan.PlainHttp
 import dev.hivemind.mobile.core.lan.StoredLan
+import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.core.notify.LocalNotifier
 import dev.hivemind.mobile.core.relay.KeystoreAccountVault
 import dev.hivemind.mobile.core.relay.NaClBox
@@ -24,6 +25,7 @@ import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.core.state.HubState
 import dev.hivemind.mobile.core.store.Pairing
 import dev.hivemind.mobile.core.store.PairingStore
+import dev.hivemind.mobile.core.store.db.OfflineCache
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +53,7 @@ class AppContainer(context: Context) {
     val notifier = LocalNotifier(context)
     val hubState = HubState(json)
     val api = ApiClient(json, plainHttp)
+    val cache = OfflineCache.build(context, json)
     val lanNotice = MutableStateFlow<String?>(null)
     private val rebindGate = AtomicBoolean(false)
 
@@ -77,6 +80,25 @@ class AppContainer(context: Context) {
         notifier.ensureChannels()
         hubState.onApprovalRequest = { info -> notifier.notifyApproval(info) }
         hubState.onTeamFinished = { snapshot -> notifier.notifyFinished(snapshot) }
+
+        // Cache offline Room (Spec 10): persiste todo snapshot vivo e semeia o
+        // app com o último estado conhecido antes de qualquer chamada de rede.
+        appScope.launch {
+            runCatching {
+                hubState.setProjects(cache.cachedProjects())
+                hubState.setLanes(cache.cachedLanes())
+            }.onFailure { Log.w("HiveMind", "cache offline ilegível: ${it.message}") }
+        }
+        appScope.launch {
+            hubState.projects.collect { list ->
+                runCatching { cache.saveProjects(list) }
+            }
+        }
+        appScope.launch {
+            hubState.lanes.collect { map ->
+                runCatching { cache.saveLanes(map.values.toList()) }
+            }
+        }
 
         // Troca 4G ↔ Wi-Fi só no pareamento LAN. O relay tem o próprio backoff.
         appScope.launch {
@@ -251,6 +273,22 @@ class AppContainer(context: Context) {
 
     suspend fun refreshLanes(workspace: String? = null) {
         runCatching { api.lanes(workspace) }.onSuccess { hubState.setLanes(it) }
+    }
+
+    /**
+     * Diffs com cache offline (Spec 10): a rede manda o estado vivo; se a
+     * ponta não responder, devolve o último snapshot persistido em Room.
+     */
+    suspend fun loadDiffs(workspace: String): List<FileDiff> {
+        try {
+            val files = api.diffs(workspace)
+            runCatching { cache.saveDiffs(workspace, files) }
+            return files
+        } catch (e: Exception) {
+            val cached = runCatching { cache.cachedDiffs(workspace) }.getOrDefault(emptyList())
+            if (cached.isNotEmpty()) return cached
+            throw e
+        }
     }
 
     suspend fun startRun(

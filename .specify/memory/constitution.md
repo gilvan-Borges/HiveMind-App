@@ -1,7 +1,7 @@
 # Constituição de Design System (SDD) — HiveMind-App
 
-> Versão 1.0.0 · Espelho oficial da Constituição SDD do repositório `gilvan-Borges/hivemind` (`.specify/memory/constitution.md`).
-> Base comparativa: estrutura SDD rastreável (`Vibetex/ipg` `.specify`) + fundação visual e tokens por papel (`Havruss/havrus`).
+> Versão 1.1.0 · Espelho oficial da Constituição SDD do repositório `gilvan-Borges/hivemind` (`.specify/memory/constitution.md`).
+> Base comparativa: estrutura SDD rastreável (`.specify`) + fundação visual e tokens por papel (paleta **Havrus Obsidian & Brand Gold**).
 
 ## Artigos (D1–D8)
 - **D1. Tokens por papel:** toda cor nasce em `Theme.kt` e `colors.xml` (nunca `Color(0xFF...)` solto em telas Compose novas).
@@ -20,3 +20,4 @@
 - **D6. Família única de ícones (Material Icons) e zero emojis estruturais.**
 - **D7. Alvos de toque >= 44×44 dp (`48×48 dp` recomendado) e respeito a acessibilidade.**
 - **D8. Paridade 1:1 com o `HiveMind` IDE (`ide/frontend/src/styles.css`).**
+- **D9. Política de Repositório Público:** proibido commitar segredos, keystores, `.apk`/`.aab` ou dados reais de terceiros/clientes (nomes, domínios, e-mails pessoais reais ou usernames). Permitidos apenas dados do autor/mantenedor (`Gilvan Borges` / `gilvan-Borges`); testes e exemplos usam somente dados sintéticos (`org-alpha`, `example.com`, `PROJ-123`).

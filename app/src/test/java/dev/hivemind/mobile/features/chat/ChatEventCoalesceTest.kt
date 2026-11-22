@@ -58,4 +58,49 @@ class ChatEventCoalesceTest {
         assertEquals("1.5k", formatTokens(1500))
         assertEquals("2.0M", formatTokens(2_000_000))
     }
+
+    @Test
+    fun mergesJevRouteAndFailoverBadges() {
+        val events = listOf(
+            LaneEventItem(
+                kind = "model_route",
+                provider = "opencode",
+                model = "gpt-5",
+                tier = "standard",
+                estimatedMicroUsd = 1234,
+            ),
+            LaneEventItem(
+                kind = "provider_failover",
+                fromProvider = "agy",
+                fromModel = "gemini-2.5",
+                provider = "opencode",
+                model = "gpt-5",
+                reasons = listOf("quota"),
+            ),
+            LaneEventItem(kind = "provider_exhausted", text = ""),
+        )
+
+        val result = coalesceChatEvents(events)
+
+        val route = result[0] as ChatDisplayItem.RouteBadge
+        assertEquals("opencode", route.provider)
+        assertEquals("gpt-5", route.model)
+        assertEquals(1234L, route.estimatedMicroUsd)
+
+        val failover = result[1] as ChatDisplayItem.FailoverItem
+        assertEquals("agy", failover.fromProvider)
+        assertEquals("opencode", failover.provider)
+        assertEquals(listOf("quota"), failover.reasons)
+
+        // exhausted sem texto ainda vira erro com mensagem padrão legível.
+        val exhausted = result[2] as ChatDisplayItem.ErrorItem
+        assertTrue(exhausted.text.contains("esgotados"))
+    }
+
+    @Test
+    fun formatsMicroUsdHumanReadable() {
+        assertEquals("$0.0123", formatMicroUsd(12_300))
+        assertEquals("$0.001234", formatMicroUsd(1_234))
+        assertEquals("$1.25", formatMicroUsd(1_250_000))
+    }
 }

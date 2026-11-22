@@ -8,6 +8,9 @@ import dev.hivemind.mobile.core.models.LaneEvent
 import dev.hivemind.mobile.core.models.LaneEventItem
 import dev.hivemind.mobile.core.models.LaneSnapshot
 import dev.hivemind.mobile.core.models.ProjectSummary
+import dev.hivemind.mobile.core.models.ProviderHealthPayload
+import dev.hivemind.mobile.core.models.ProviderHealthView
+import dev.hivemind.mobile.core.models.RelayGapPayload
 import dev.hivemind.mobile.core.models.StreamEvent
 import dev.hivemind.mobile.core.store.Pairing
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,9 +29,13 @@ sealed interface ConnState {
     data class Reconnecting(val attempt: Int) : ConnState
 }
 
+/** Aviso de um `relay_gap`: o buffer do relay transbordou e o fluxo pode ter furos. */
+data class RelayGapNotice(val reason: String, val at: Long)
+
 /**
  * Estado vivo do app: pareamento, conexão, projetos, lanes (snapshot por
- * workspace|laneId), aprovações pendentes e status do Auto-Review.
+ * workspace|laneId), aprovações pendentes, status do Auto-Review, saúde de
+ * provedores (Jev) e avisos de `relay_gap`.
  */
 class HubState(private val json: Json) {
 
@@ -39,6 +46,8 @@ class HubState(private val json: Json) {
     val projects = MutableStateFlow<List<ProjectSummary>>(emptyList())
     val lanes = MutableStateFlow<Map<String, LaneSnapshot>>(emptyMap())
     val autoreview = MutableStateFlow<Map<String, AutoReviewStatus>>(emptyMap())
+    val providerHealth = MutableStateFlow<List<ProviderHealthView>>(emptyList())
+    val relayGap = MutableStateFlow<RelayGapNotice?>(null)
 
     val selectedWorkspace = MutableStateFlow<String?>(null)
     val selectedLaneId = MutableStateFlow<String?>(null)
@@ -91,6 +100,15 @@ class HubState(private val json: Json) {
             text = e.text.orEmpty(),
             toolName = e.toolName.orEmpty(),
             tokens = e.tokens,
+            provider = e.provider.orEmpty(),
+            model = e.model.orEmpty(),
+            fromProvider = e.fromProvider.orEmpty(),
+            fromModel = e.fromModel.orEmpty(),
+            tier = e.tier.orEmpty(),
+            reasons = e.reasons,
+            estimatedMicroUsd = e.estimatedMicroUsd,
+            decisionMicros = e.decisionMicros,
+            health = e.health,
             at = now,
         )
         var approvals = snapshot.pendingApprovals
@@ -113,6 +131,8 @@ class HubState(private val json: Json) {
                         workspace = snapshot.workspace,
                         prompt = e.text.orEmpty(),
                         label = e.label.orEmpty(),
+                        toolName = e.toolName.orEmpty(),
+                        riskTier = e.gate.orEmpty(),
                         createdAt = now,
                     )
                     approvals.lastOrNull()?.let { onApprovalRequest?.invoke(it) }
@@ -158,6 +178,28 @@ class HubState(private val json: Json) {
 
     fun onAutoReviewStatus(st: AutoReviewStatus) {
         autoreview.value = autoreview.value + (st.workspace to st)
+    }
+
+    /** SSE provider_health — últimos estados de circuito dos provedores (Jev). */
+    fun onProviderHealth(payload: ProviderHealthPayload) {
+        providerHealth.value = payload.providers
+    }
+
+    /**
+     * SSE relay_gap — o relay perdeu eventos (backlog truncado). A suposição de
+     * fluxo completo entre o último seq e agora é descartada: aplica o snapshot
+     * vivo recebido (aprovações pendentes inclusas) e avisa a UI.
+     */
+    fun onRelayGap(payload: RelayGapPayload) {
+        if (payload.lanes.isNotEmpty()) setLanes(payload.lanes)
+        relayGap.value = RelayGapNotice(
+            reason = payload.reason.ifBlank { "backlog_truncated" },
+            at = System.currentTimeMillis(),
+        )
+    }
+
+    fun clearRelayGap() {
+        relayGap.value = null
     }
 
     /**
@@ -218,6 +260,16 @@ class HubState(private val json: Json) {
             "autoreview_status" -> {
                 val data = ev.data ?: return
                 runCatching { json.decodeFromString<AutoReviewStatus>(data.toString()) }.onSuccess(::onAutoReviewStatus)
+            }
+            "provider_health" -> {
+                val data = ev.data ?: return
+                runCatching { json.decodeFromString<ProviderHealthPayload>(data.toString()) }
+                    .onSuccess { onProviderHealth(it) }
+            }
+            "relay_gap" -> {
+                val data = ev.data ?: return
+                runCatching { json.decodeFromString<RelayGapPayload>(data.toString()) }
+                    .onSuccess { onRelayGap(it) }
             }
             else -> Unit
         }

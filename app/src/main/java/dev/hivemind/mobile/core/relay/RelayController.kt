@@ -25,6 +25,18 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
 /**
+ * A chave pública da IDE mudou em relação ao pin TOFU. Nada é adotado antes
+ * de uma confirmação explícita (Spec 10: nunca aceitar silenciosamente).
+ */
+data class KeyRotationNotice(
+    val deviceId: String,
+    val deviceName: String,
+    val oldFingerprint: String,
+    val newFingerprint: String,
+    val atMs: Long,
+)
+
+/**
  * Sessão do app com o relay: contas isoladas, rotação de refresh, lista de IDEs,
  * vínculo e o WebSocket cifrado. A senha nunca é gravada.
  */
@@ -61,6 +73,11 @@ class RelayController(
     private val ideOnlineFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
     private val e2eFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
     private val readyFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val keyRotationFlow = kotlinx.coroutines.flow.MutableStateFlow<KeyRotationNotice?>(null)
+
+    /** Nova chave da IDE aguardando confirmação do usuário (TOFU). */
+    @Volatile
+    private var pendingPeerKey: String? = null
 
     val accounts = accountsFlow
     val active = activeFlow
@@ -73,6 +90,9 @@ class RelayController(
     val loginDraft = draftFlow
     val ideOnlineState = ideOnlineFlow
     val e2eReady = e2eFlow
+
+    /** Rotação de chave TOFU pendente de confirmação do usuário, se houver. */
+    val keyRotation: kotlinx.coroutines.flow.StateFlow<KeyRotationNotice?> get() = keyRotationFlow
 
     override val ideOnline: Boolean get() = ideOnlineFlow.value
     override val ready: Boolean get() = readyFlow.value
@@ -499,7 +519,8 @@ class RelayController(
         val resume = vault.getSecret(meta.id, SessionSecrets.seqKey(device.id))?.toLongOrNull() ?: 0L
         val eng = RelaySessionEngine(keys, device.id, resume)
         if (device.idePublicKey.isNotBlank()) {
-            eng.peerPublic = runCatching { NaClBox.parseKey(device.idePublicKey) }.getOrNull()
+            // TOFU: primeira chave é pinada; divergência vira aviso, nunca adoção silenciosa.
+            adoptPeerKey(eng, device.id, device.idePublicKey)
         }
         engine = eng
         readyFlow.value = false
@@ -574,8 +595,8 @@ class RelayController(
         when (val effect = eng.onFrame(text)) {
             is FrameEffect.Send -> webSocket.send(effect.text)
             is FrameEffect.Hello -> {
-                if (effect.peerPublicKey.isNotBlank()) {
-                    runCatching { NaClBox.parseKey(effect.peerPublicKey) }.onSuccess { eng.peerPublic = it }
+                if (effect.peerPublicKey.isNotBlank() && keyRotationFlow.value == null) {
+                    adoptPeerKey(eng, device.id, effect.peerPublicKey)
                 }
                 e2eFlow.value = effect.e2eReady && eng.peerPublic != null
                 ideOnlineFlow.value = effect.online
@@ -607,15 +628,79 @@ class RelayController(
             }
             is FrameEffect.Peer -> {
                 if (effect.publicKey.isNotBlank() && effect.role != "app") {
-                    runCatching { NaClBox.parseKey(effect.publicKey) }.onSuccess {
-                        eng.peerPublic = it
-                        e2eFlow.value = true
-                        readyFlow.value = true
-                    }
+                    // Rotação publicada pela IDE no meio da sessão: mesma política TOFU.
+                    adoptPeerKey(eng, device.id, effect.publicKey)
+                }
+            }
+            is FrameEffect.Presence -> {
+                // Presença instantânea (Spec 09/W5-02): o polling de 20s vira fallback.
+                if (effect.role != "app") {
+                    ideOnlineFlow.value = effect.online
                 }
             }
             FrameEffect.Ignored -> Unit
         }
+    }
+
+    /**
+     * Aplica a política TOFU à chave pública que o relay apresentou para a IDE:
+     * pin na primeira vista, adoção silenciosa quando confere, aviso bloqueante
+     * quando divergir do pin (E2E cai até a pessoa decidir).
+     */
+    private fun adoptPeerKey(eng: RelaySessionEngine, deviceId: String, incomingKey: String) {
+        val accountId = session.accountId ?: return
+        val pinned = vault.getSecret(accountId, SessionSecrets.peerKeyKey(deviceId))
+        when (val trust = KeyTrustPolicy.evaluate(pinned, incomingKey)) {
+            is KeyTrust.NoKey -> Unit
+            is KeyTrust.FirstUse -> {
+                vault.putSecret(accountId, SessionSecrets.peerKeyKey(deviceId), trust.newKey)
+                pendingPeerKey = null
+                eng.peerPublic = runCatching { NaClBox.parseKey(trust.newKey) }.getOrNull()
+            }
+            is KeyTrust.Match -> {
+                pendingPeerKey = null
+                eng.peerPublic = runCatching { NaClBox.parseKey(trust.key) }.getOrNull()
+            }
+            is KeyTrust.Rotated -> {
+                pendingPeerKey = trust.incomingKey
+                keyRotationFlow.value = KeyRotationNotice(
+                    deviceId = deviceId,
+                    deviceName = devicesFlow.value.find { it.id == deviceId }?.name.orEmpty(),
+                    oldFingerprint = KeyTrustPolicy.fingerprint(trust.pinnedKey),
+                    newFingerprint = KeyTrustPolicy.fingerprint(trust.incomingKey),
+                    atMs = clock(),
+                )
+                // Falha fechada: sem chave nova adotada, a E2E fica inoperante até a decisão.
+                eng.peerPublic = null
+                e2eFlow.value = false
+                readyFlow.value = false
+                warn("chave da IDE divergiu do pin TOFU; aguardando confirmação do usuário")
+            }
+        }
+    }
+
+    /** Confirma a rotação: pin a nova chave, reativa a E2E e segue no mesmo socket. */
+    fun acceptKeyRotation() {
+        val notice = keyRotationFlow.value ?: return
+        val newKey = pendingPeerKey ?: return
+        val accountId = session.accountId ?: return
+        vault.putSecret(accountId, SessionSecrets.peerKeyKey(notice.deviceId), newKey)
+        pendingPeerKey = null
+        keyRotationFlow.value = null
+        val eng = engine
+        if (eng != null) {
+            eng.peerPublic = runCatching { NaClBox.parseKey(newKey) }.getOrNull()
+            e2eFlow.value = eng.peerPublic != null
+            readyFlow.value = e2eFlow.value
+            if (e2eFlow.value) onConn(ConnState.Connected)
+        }
+    }
+
+    /** Recusa a rotação: encerra o túnel sem adotar a chave desconhecida. */
+    fun rejectKeyRotation() {
+        pendingPeerKey = null
+        keyRotationFlow.value = null
+        scope.launch { disconnectIde() }
     }
 
     private suspend fun refreshIfNeeded(force: Boolean) {
@@ -679,6 +764,8 @@ class RelayController(
         socket?.cancel()
         socket = null
         engine = null
+        pendingPeerKey = null
+        keyRotationFlow.value = null
         previous?.cancel()
         previous?.join()
         job = null

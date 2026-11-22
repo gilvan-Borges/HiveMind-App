@@ -1,6 +1,7 @@
 package dev.hivemind.mobile.features.pairing
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,7 +69,7 @@ import dev.hivemind.mobile.core.api.PairQr
 import dev.hivemind.mobile.core.lan.LanMessages
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.SteelBlue
+import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.ErrorBanner
 import dev.hivemind.mobile.ui.HiveCard
@@ -135,7 +136,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        StatusPill(text = "Rede local · LAN / Tailscale", color = SteelBlue)
+        StatusPill(text = "Rede local · LAN / Tailscale", color = BrandGold)
         Spacer(Modifier.height(12.dp))
         Text(
             "HiveMind Mobile",
@@ -156,7 +157,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             Button(
                 onClick = { scanning = true },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SteelBlue,
+                    containerColor = BrandGold,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -181,7 +182,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
             if (showManual) {
                 Spacer(Modifier.height(14.dp))
                 val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SteelBlue,
+                    focusedBorderColor = BrandGold,
                     unfocusedBorderColor = ObsidianBorder,
                     focusedContainerColor = ObsidianSurface,
                     unfocusedContainerColor = ObsidianSurface,
@@ -210,7 +211,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
                     },
                     enabled = !connecting,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SteelBlue,
+                        containerColor = BrandGold,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                     shape = RoundedCornerShape(12.dp),
@@ -255,6 +256,11 @@ private fun finishPairing(
 }
 
 /** Overlay de câmera com detecção de QR Code (CameraX + ML Kit). */
+// @OptIn cobre o compilador; o UnsafeOptInUsageError do lint não rastreia
+// @OptIn Kotlin através das lambdas aninhadas do CameraX, então o checker
+// é silenciado especificamente para o ImageProxy.image.
+@OptIn(androidx.camera.core.ExperimentalGetImage::class)
+@SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun QrScannerOverlay(
     onResult: (String) -> Unit,

@@ -2,10 +2,12 @@ package dev.hivemind.mobile.core.state
 
 import dev.hivemind.mobile.core.models.LaneEvent
 import dev.hivemind.mobile.core.models.OrchestratorEvent
+import dev.hivemind.mobile.core.models.StreamEvent
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -84,5 +86,88 @@ class HubStateTest {
         assertEquals(1, state.lanesOf("C:/a").size)
         assertEquals(1, state.lanesOf("C:/b").size)
         assertEquals(2, state.lanes.value.size)
+    }
+
+    @Test
+    fun `provider_health alimenta o fluxo de saúde`() {
+        val state = HubState(json)
+        state.onStreamEvent(
+            StreamEvent(
+                type = "provider_health",
+                data = json.parseToJsonElement(
+                    """{"providers":[{"provider":"agy","state":"open","reason":"quota","dailySpentMicroUsd":1500,"dailyCapMicroUsd":2000}]}""",
+                ),
+            ),
+        )
+        val health = state.providerHealth.value
+        assertEquals(1, health.size)
+        assertEquals("agy", health[0].provider)
+        assertEquals("open", health[0].state)
+        assertEquals(1500L, health[0].dailySpentMicroUsd)
+    }
+
+    @Test
+    fun `relay_gap aplica o snapshot de lanes e avisa`() {
+        val state = HubState(json)
+        state.onStreamEvent(
+            StreamEvent(
+                type = "relay_gap",
+                data = json.parseToJsonElement(
+                    """{"reason":"backlog_truncated","lanes":[
+                        {"workspace":"C:/w","laneId":"l1","running":true,"stage":"dev",
+                         "pendingApprovals":[{"approvalId":"a9","laneId":"l1","workspace":"C:/w","prompt":"ok"}]}
+                    ]}""",
+                ),
+            ),
+        )
+        assertEquals(1, state.lanes.value.size)
+        assertEquals("dev", state.lane("C:/w", "l1")!!.stage)
+        assertEquals(1, state.pendingApprovals.value.size)
+        assertEquals("backlog_truncated", state.relayGap.value!!.reason)
+        state.clearRelayGap()
+        assertEquals(null, state.relayGap.value)
+    }
+
+    @Test
+    fun `lane event carrega metadados jev no transcript`() {
+        val state = HubState(json)
+        state.selectedWorkspace.value = "C:/w"
+        state.onLaneEvent(
+            LaneEvent(
+                "l1", "t",
+                OrchestratorEvent(
+                    kind = "provider_failover",
+                    provider = "opencode",
+                    model = "gpt-5",
+                    fromProvider = "agy",
+                    fromModel = "gemini-2.5",
+                    tier = "standard",
+                    reasons = listOf("quota"),
+                    estimatedMicroUsd = 4200,
+                    decisionMicros = 900,
+                ),
+            ),
+        )
+        val item = state.lane("C:/w", "l1")!!.recentEvents.single()
+        assertEquals("opencode", item.provider)
+        assertEquals("gpt-5", item.model)
+        assertEquals("agy", item.fromProvider)
+        assertEquals("standard", item.tier)
+        assertEquals(listOf("quota"), item.reasons)
+        assertEquals(4200L, item.estimatedMicroUsd)
+        assertEquals(900L, item.decisionMicros)
+    }
+
+    @Test
+    fun `approval_required carrega o gate como riskTier`() {
+        val state = HubState(json)
+        state.selectedWorkspace.value = "C:/w"
+        state.onLaneEvent(
+            LaneEvent(
+                "l1", "t",
+                OrchestratorEvent(kind = "approval_required", approvalId = "ap1", text = "commit?", gate = "worktree"),
+            ),
+        )
+        assertEquals("worktree", state.pendingApprovals.value.single().riskTier)
     }
 }
