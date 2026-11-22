@@ -53,12 +53,17 @@ import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.MainTab
 import dev.hivemind.mobile.core.models.ProjectSummary
+import dev.hivemind.mobile.theme.ActionPrimary
+import dev.hivemind.mobile.theme.ActionPrimaryText
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
+import dev.hivemind.mobile.theme.ObsidianSurface
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
+import dev.hivemind.mobile.theme.TextBody
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.theme.TextPrimary
 import dev.hivemind.mobile.ui.ConnectionBadge
 import dev.hivemind.mobile.ui.EmptyStatePanel
 import dev.hivemind.mobile.ui.HiveCard
@@ -353,7 +358,7 @@ private fun ProjectCard(
 
         Spacer(Modifier.height(12.dp))
 
-        // Ações rápidas com alvo >= 40dp (Lei de Fitts + Pareto 80/20).
+        // Ações rápidas nativas (SDD D4: ActionPrimary neutra em destaque, secundárias sutis).
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -361,20 +366,29 @@ private fun ProjectCard(
             Button(
                 onClick = onSelectChat,
                 modifier = Modifier
-                    .weight(1.2f)
-                    .heightIn(min = 40.dp),
+                    .weight(1.25f)
+                    .heightIn(min = 44.dp),
                 shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isActive) ActionPrimary else ObsidianSurface,
+                    contentColor = if (isActive) ActionPrimaryText else TextPrimary,
+                ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Text("Abrir Chat", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "Abrir Chat",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             OutlinedButton(
                 onClick = onSelectFlow,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 40.dp),
+                    .heightIn(min = 44.dp),
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, ObsidianBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextBody),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Text("Fluxo", style = MaterialTheme.typography.labelMedium)
@@ -383,9 +397,10 @@ private fun ProjectCard(
                 onClick = onSelectDiffs,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 40.dp),
+                    .heightIn(min = 44.dp),
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, ObsidianBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextBody),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Text("Diffs", style = MaterialTheme.typography.labelMedium)
@@ -397,8 +412,9 @@ private fun ProjectCard(
 @Composable
 private fun MetaChip(label: String) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(8.dp),
+        color = ObsidianSurface,
+        border = BorderStroke(1.dp, ObsidianBorder),
     ) {
         Text(
             text = label,
@@ -406,7 +422,7 @@ private fun MetaChip(label: String) {
             color = TextDim,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
 }

@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +42,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -46,8 +54,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,6 +83,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dev.hivemind.mobile.core.connect.ConnectivityService
+import dev.hivemind.mobile.core.relay.KeyRotationNotice
 import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.features.chat.ChatScreen
 import dev.hivemind.mobile.features.diffs.DiffsScreen
@@ -84,6 +97,7 @@ import dev.hivemind.mobile.theme.BrandGoldBorder
 import dev.hivemind.mobile.theme.BrandGoldSubtle
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.HiveMindTheme
+import dev.hivemind.mobile.theme.MonoFonts
 import dev.hivemind.mobile.theme.ObsidianBg
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
@@ -97,10 +111,10 @@ import dev.hivemind.mobile.ui.StatusPill
 import kotlinx.coroutines.launch
 
 enum class MainTab(val label: String, val icon: ImageVector) {
-    Projects("Projetos", Icons.Filled.Home),
     Chat("Chat", Icons.AutoMirrored.Filled.Send),
     Flow("Fluxo", Icons.Filled.Build),
     Diffs("Diffs", Icons.AutoMirrored.Filled.List),
+    Projects("Projetos", Icons.Filled.Home),
 }
 
 class MainActivity : ComponentActivity() {
@@ -116,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 val loggedIn by container.relay.loggedIn.collectAsState()
                 NotificationPermissionRequest()
                 BackgroundConnectionBinder(container)
+                KeyRotationDialog(container)
                 when {
                     pairing != null -> MainScaffold(container)
                     loggedIn -> RelayDevicesScreen(container)
@@ -124,6 +139,44 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+@Composable
+fun KeyRotationDialog(container: AppContainer) {
+    val rotation by container.relay.keyRotation.collectAsState()
+    val notice: KeyRotationNotice = rotation ?: return
+    AlertDialog(
+        onDismissRequest = { container.relay.rejectKeyRotation() },
+        containerColor = ObsidianSurface,
+        title = { Text("Chave da IDE mudou", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "A chave pública da IDE \"${notice.deviceName.ifBlank { notice.deviceId.take(8) }}\" " +
+                        "não confere com a chave pareada neste aparelho (TOFU).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text("Antiga: ${notice.oldFingerprint}", style = MaterialTheme.typography.labelSmall, fontFamily = MonoFonts, color = TextDim)
+                Text("Nova: ${notice.newFingerprint}", style = MaterialTheme.typography.labelSmall, fontFamily = MonoFonts, color = BrandGold)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { container.relay.acceptKeyRotation() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandGold,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                shape = RoundedCornerShape(10.dp),
+            ) { Text("Confiar na chave nova", fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = { container.relay.rejectKeyRotation() },
+                shape = RoundedCornerShape(10.dp),
+            ) { Text("Recusar", color = ErrorRed) }
+        },
+    )
 }
 
 @Composable
@@ -211,7 +264,9 @@ fun MainScaffold(container: AppContainer) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(horizontal = 14.dp, vertical = 16.dp),
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -328,8 +383,12 @@ fun MainScaffold(container: AppContainer) {
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
+                                        val metaSubtitle = listOfNotNull(
+                                            project.branch.takeIf { it.isNotBlank() },
+                                            project.stack.takeIf { it.isNotBlank() },
+                                        ).joinToString(" · ").ifBlank { leaf }
                                         Text(
-                                            project.workspace,
+                                            metaSubtitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TextDim,
                                             maxLines = 1,
@@ -428,44 +487,63 @@ fun MainScaffold(container: AppContainer) {
             }
         },
     ) {
+        val anyRunning = projects.any { it.runningLanes > 0 }
         Scaffold(
             containerColor = ObsidianBg,
-            topBar = {
-                if (tab != MainTab.Chat) {
-                    Surface(color = SurfacePanel) {
-                        Column {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                IconButton(
-                                    onClick = { tab = MainTab.Chat },
-                                    modifier = Modifier.size(48.dp),
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Voltar ao chat",
-                                        tint = TextPrimary,
+            contentWindowInsets = WindowInsets.systemBars,
+            bottomBar = {
+                Column {
+                    HorizontalDivider(color = ObsidianBorder)
+                    NavigationBar(
+                        containerColor = SurfacePanel,
+                        tonalElevation = 0.dp,
+                    ) {
+                        MainTab.entries.forEach { t ->
+                            val selected = tab == t
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { tab = t },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = BrandGold,
+                                    selectedTextColor = TextPrimary,
+                                    indicatorColor = BrandGoldSubtle,
+                                    unselectedIconColor = TextDim,
+                                    unselectedTextColor = TextDim,
+                                ),
+                                icon = {
+                                    if (t == MainTab.Chat && (pendingApprovals.isNotEmpty() || anyRunning)) {
+                                        BadgedBox(
+                                            badge = {
+                                                if (pendingApprovals.isNotEmpty()) {
+                                                    Badge(
+                                                        containerColor = ApprovalAmber,
+                                                        contentColor = ObsidianBg,
+                                                    ) {
+                                                        Text(pendingApprovals.size.toString())
+                                                    }
+                                                } else {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .background(SuccessGreen, CircleShape),
+                                                    )
+                                                }
+                                            },
+                                        ) {
+                                            Icon(t.icon, contentDescription = t.label)
+                                        }
+                                    } else {
+                                        Icon(t.icon, contentDescription = t.label)
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        t.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                     )
-                                }
-                                Text(
-                                    tab.label,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (pendingApprovals.isNotEmpty()) {
-                                    StatusPill(
-                                        text = "${pendingApprovals.size} pend.",
-                                        color = ApprovalAmber,
-                                        showDot = true,
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = ObsidianBorder)
+                                },
+                            )
                         }
                     }
                 }

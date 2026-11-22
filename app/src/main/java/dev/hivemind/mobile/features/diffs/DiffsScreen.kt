@@ -1,4 +1,4 @@
-﻿package dev.hivemind.mobile.features.diffs
+package dev.hivemind.mobile.features.diffs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -103,7 +103,7 @@ fun DiffsScreen(
             file = open,
             padding = padding,
             onBack = { selected = null },
-            onAskInChat = { onAskInChat("Revise e ajuste as alteraÃ§Ãµes em @${open.path}: ") },
+            onAskInChat = { onAskInChat("Revise e ajuste as alterações em @${open.path}: ") },
         )
         return
     }
@@ -128,7 +128,7 @@ fun DiffsScreen(
                         )
                         if (!loading && error == null && files.isNotEmpty()) {
                             Text(
-                                "${files.size} arquivo(s) Â· +$totalAdded -$totalRemoved",
+                                "${files.size} arquivo(s) · +$totalAdded -$totalRemoved",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextDim,
                             )
@@ -157,7 +157,7 @@ fun DiffsScreen(
             }
             files.isEmpty() -> EmptyStatePanel(
                 title = "Workspace limpo",
-                subtitle = "Nenhuma alteraÃ§Ã£o pendente de commit neste projeto.",
+                subtitle = "Nenhuma alteração pendente de commit neste projeto.",
                 actionLabel = "Atualizar",
                 onAction = { container.appScope.launch { load() } },
             )
@@ -201,7 +201,7 @@ fun DiffsScreen(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                             }
-                            Text("â€º", style = MaterialTheme.typography.titleMedium, color = TextDim)
+                            Text("›", style = MaterialTheme.typography.titleMedium, color = TextDim)
                         }
                     }
                 }
@@ -318,5 +318,5 @@ private fun statusStyle(status: String): Pair<String, Color> = when (status) {
     "R" -> "R" to BrandGold
     "U" -> "U" to ApprovalAmber
     "M" -> "M" to BrandGold
-    else -> "â€¢" to TextDim
+    else -> "•" to TextDim
 }

@@ -74,6 +74,45 @@ class HubState(private val json: Json) {
         refreshPending()
     }
 
+    fun setWorkspaceLanes(workspace: String, list: List<LaneSnapshot>) {
+        val kept = lanes.value.filterValues { it.workspace != workspace }
+        lanes.value = kept + list.associateBy { it.key }
+        refreshPending()
+    }
+
+    fun pruneDeletedSessions(workspace: String, activeSessionIds: Set<String>) {
+        if (workspace.isBlank()) return
+        val next = lanes.value.filterValues { lane ->
+            if (lane.workspace != workspace || lane.running) {
+                true
+            } else if (activeSessionIds.isEmpty()) {
+                false
+            } else if (lane.sessionId.isNotBlank() && lane.sessionId !in activeSessionIds) {
+                false
+            } else {
+                true
+            }
+        }
+        if (next.size != lanes.value.size) {
+            lanes.value = next
+            refreshPending()
+        }
+    }
+
+    fun clearLaneConversation(workspace: String, laneId: String? = null) {
+        if (workspace.isBlank()) return
+        lanes.value = lanes.value.filterValues { lane ->
+            if (lane.workspace != workspace || lane.running) {
+                true
+            } else if (!laneId.isNullOrBlank()) {
+                lane.laneId != laneId
+            } else {
+                false
+            }
+        }
+        refreshPending()
+    }
+
     fun setLane(s: LaneSnapshot) {
         lanes.value = lanes.value + (s.key to s)
         refreshPending()
@@ -270,6 +309,21 @@ class HubState(private val json: Json) {
                 val data = ev.data ?: return
                 runCatching { json.decodeFromString<RelayGapPayload>(data.toString()) }
                     .onSuccess { onRelayGap(it) }
+            }
+            "lanes_cleared" -> {
+                val obj = ev.data as? JsonObject
+                val ws = obj?.get("workspace")?.toString()?.trim('"').orEmpty()
+                val sid = obj?.get("sessionId")?.toString()?.trim('"').orEmpty()
+                if (ws.isNotBlank()) {
+                    if (sid.isBlank()) {
+                        clearLaneConversation(ws, null)
+                    } else {
+                        lanes.value = lanes.value.filterValues { lane ->
+                            lane.workspace != ws || lane.running || (lane.sessionId.isNotBlank() && lane.sessionId != sid)
+                        }
+                        refreshPending()
+                    }
+                }
             }
             else -> Unit
         }

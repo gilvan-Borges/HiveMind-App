@@ -290,7 +290,30 @@ class AppContainer(context: Context) {
     }
 
     suspend fun refreshLanes(workspace: String? = null) {
-        runCatching { api.lanes(workspace) }.onSuccess { hubState.setLanes(it) }
+        runCatching { api.lanes(workspace) }.onSuccess { list ->
+            if (workspace.isNullOrBlank()) {
+                hubState.setLanes(list)
+            } else {
+                hubState.setWorkspaceLanes(workspace, list)
+            }
+        }
+        val targets = if (!workspace.isNullOrBlank()) {
+            listOf(workspace)
+        } else {
+            (hubState.lanes.value.values.map { it.workspace } + listOfNotNull(hubState.selectedWorkspace.value))
+                .filter { it.isNotBlank() }
+                .distinct()
+        }
+        for (ws in targets) {
+            runCatching { api.sessions(ws) }.onSuccess { summary ->
+                val activeIds = summary.sessions.map { it.id }.filter { it.isNotBlank() }.toSet()
+                hubState.pruneDeletedSessions(ws, activeIds)
+            }
+        }
+    }
+
+    fun clearConversation(workspace: String, laneId: String? = null) {
+        hubState.clearLaneConversation(workspace, laneId)
     }
 
     /**

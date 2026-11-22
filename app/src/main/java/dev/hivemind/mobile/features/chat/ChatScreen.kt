@@ -1,4 +1,4 @@
-﻿package dev.hivemind.mobile.features.chat
+package dev.hivemind.mobile.features.chat
 
 import android.content.Context
 import android.net.Uri
@@ -132,7 +132,10 @@ private val RunModes = listOf(
     "auto" to "Auto",
     "direct" to "Direto",
     "plan" to "Planejar",
+    "plan:sdd" to "SDD",
+    "plan:sdd-jira" to "SDD + Jira",
     "squad" to "Squad",
+    "resident" to "Residente",
 )
 
 private val StarterPrompts = listOf(
@@ -163,8 +166,26 @@ sealed class ChatDisplayItem {
  * Agrupa chunks consecutivos de texto do mesmo autor e chamadas repetidas da mesma ferramenta
  * (Law of Chunking + Miller's Law) para leitura rápida no celular.
  */
+private fun simplifyErrorMessage(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return "Falha na execução."
+    // Extrai mensagem legível quando o backend anexa payload JSON bruto do GitHub (ex.: 422 Unprocessable Entity: {"message":...})
+    val jsonIdx = trimmed.indexOf(": {")
+    if (jsonIdx > 0 && trimmed.endsWith("}")) {
+        val prefix = trimmed.substring(0, jsonIdx).trim()
+        val msgRegex = Regex(""""message"\s*:\s*"([^"]+)"""")
+        val matches = msgRegex.findAll(trimmed.substring(jsonIdx)).map { it.groupValues[1] }.toList()
+        val detail = matches.lastOrNull { !it.equals("Validation Failed", ignoreCase = true) } ?: matches.firstOrNull()
+        if (!detail.isNullOrBlank()) {
+            return "$prefix — $detail"
+        }
+    }
+    return trimmed
+}
+
 fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
     val out = mutableListOf<ChatDisplayItem>()
+    var lastStage = ""
     for (e in events) {
         when (e.kind) {
             "approval_required" -> Unit
@@ -182,8 +203,8 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
             }
             "stage" -> {
                 val stage = e.stage.ifBlank { "—" }
-                val prev = out.lastOrNull() as? ChatDisplayItem.StageBadge
-                if (prev?.stage != stage) {
+                if (stage != lastStage) {
+                    lastStage = stage
                     out += ChatDisplayItem.StageBadge(stage)
                 }
             }
@@ -196,7 +217,13 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                     out += ChatDisplayItem.ToolGroup(tool, 1)
                 }
             }
-            "error" -> out += ChatDisplayItem.ErrorItem(e.text)
+            "error" -> {
+                val clean = simplifyErrorMessage(e.text)
+                val prev = out.lastOrNull() as? ChatDisplayItem.ErrorItem
+                if (prev?.text != clean) {
+                    out += ChatDisplayItem.ErrorItem(clean)
+                }
+            }
             "handoff" -> out += ChatDisplayItem.HandoffItem(e.label.ifBlank { "Handoff" })
             "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "Execução concluída." }, e.tokens)
             "model_route" -> out += ChatDisplayItem.RouteBadge(e.provider, e.model, e.tier, e.estimatedMicroUsd)
@@ -316,6 +343,21 @@ fun ChatScreen(
                             }
                         }
                     }
+                    if (lane != null && !lane.running && (lane.recentEvents.isNotEmpty() || lane.lastError.isNotBlank())) {
+                        IconButton(
+                            onClick = {
+                                continueSessionId = null
+                                container.clearConversation(ws, lane.laneId)
+                            },
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.AddCircle,
+                                contentDescription = "Nova conversa (limpar tela)",
+                                tint = BrandGold,
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { historyOpen = true },
                         modifier = Modifier.size(44.dp),
@@ -326,29 +368,9 @@ fun ChatScreen(
                             tint = TextDim,
                         )
                     }
-                    IconButton(
-                        onClick = onOpenFlow,
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.Build,
-                            contentDescription = "Fluxo da equipe",
-                            tint = TextDim,
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenDiffs,
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.List,
-                            contentDescription = "Diffs",
-                            tint = TextDim,
-                        )
-                    }
                 }
-                if (lane != null && (lane.running || lane.stage.isNotBlank())) {
-                    PipelineProgressStrip(stage = lane.stage, running = lane.running)
+                if (lane != null && lane.running) {
+                    PipelineProgressStrip(stage = lane.stage, running = true)
                 }
                 HorizontalDivider(color = ObsidianBorder)
             }
