@@ -83,6 +83,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
+import dev.hivemind.mobile.core.api.ApiException
 import dev.hivemind.mobile.core.api.ImageInput
 import dev.hivemind.mobile.core.api.RunStartRequest
 import dev.hivemind.mobile.core.media.ImagePrep
@@ -94,6 +95,9 @@ import dev.hivemind.mobile.core.models.ProviderHealthView
 import dev.hivemind.mobile.core.models.RestoredMessage
 import dev.hivemind.mobile.core.models.SessionDetail
 import dev.hivemind.mobile.core.models.SessionSummary
+import dev.hivemind.mobile.core.outbox.QueuedRun
+import dev.hivemind.mobile.core.outbox.RunQueueState
+import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.ErrorRed
@@ -340,6 +344,8 @@ fun ChatScreen(
                 modifier = Modifier.weight(1f),
             )
         }
+
+        PendingRunsPanel(container = container, workspace = ws, lane = lane)
 
         Composer(
             container = container,
@@ -884,6 +890,128 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
     }
 }
 
+/**
+ * Fila de envio do workspace (Spec 002): objetivos gravados com o bridge
+ * inacessível, entregues sozinhos quando a conexão volta e a lane está livre.
+ * Estados visíveis — Na fila / Enviando / Falhou — com ação humana apenas no
+ * FAILED (SDD D4–D5: destaque sem competir com o chat vivo).
+ */
+@Composable
+private fun PendingRunsPanel(
+    container: AppContainer,
+    workspace: String,
+    lane: LaneSnapshot?,
+) {
+    val queued by container.outbox.runs.collectAsState()
+    val items = remember(queued, workspace) {
+        queued.filter { it.workspace == workspace }.sortedBy { it.createdAt }
+    }
+    if (items.isEmpty()) return
+    Column(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items.forEach { run -> PendingRunRow(container, run, lane) }
+    }
+}
+
+@Composable
+private fun PendingRunRow(container: AppContainer, run: QueuedRun, lane: LaneSnapshot?) {
+    val haptic = LocalHapticFeedback.current
+    val foreignLane = lane != null && run.laneId != lane.laneId
+
+    val (stateLabel, stateColor) = when (run.state) {
+        RunQueueState.QUEUED -> "Na fila" to ApprovalAmber
+        RunQueueState.SENDING -> "Enviando…" to InfoBlue
+        RunQueueState.FAILED -> "Falhou no envio" to ErrorRed
+    }
+
+    Surface(
+        color = ObsidianCard,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, stateColor.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StatusPill(text = stateLabel, color = stateColor, showDot = true)
+                if (foreignLane) {
+                    Text(
+                        "lane ${run.laneId}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                run.objective,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            when (run.state) {
+                RunQueueState.QUEUED -> Text(
+                    "Envia sozinho quando o PC voltar a responder e a lane estiver livre.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDim,
+                )
+                RunQueueState.SENDING -> Unit
+                RunQueueState.FAILED -> {
+                    if (!run.lastError.isNullOrBlank()) {
+                        Text(
+                            run.lastError,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ErrorRed,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                container.appScope.launch { container.outbox.retry(run.id) }
+                            },
+                            border = BorderStroke(1.dp, BrandGold.copy(alpha = 0.45f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandGold),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 44.dp),
+                        ) {
+                            Text("Repetir", fontWeight = FontWeight.SemiBold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                container.appScope.launch { container.outbox.discard(run.id) }
+                            },
+                            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.45f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 44.dp),
+                        ) {
+                            Text("Descartar", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Composer(
     container: AppContainer,
@@ -899,6 +1027,7 @@ private fun Composer(
     var images by remember { mutableStateOf<List<ImageInput>>(emptyList()) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val conn by container.hubState.conn.collectAsState()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
@@ -937,22 +1066,59 @@ private fun Composer(
             val laneId = lane?.laneId ?: "lane-mobile"
             val activeSessionId = continueSessionId?.takeIf { it.isNotBlank() }
                 ?: lane?.sessionId?.takeIf { it.isNotBlank() }
-            runCatching {
-                container.startRun(
-                    laneId = laneId,
-                    workspace = workspace,
-                    objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." },
-                    sessionId = activeSessionId,
-                    runMode = runMode,
-                    images = images,
-                )
-            }.onSuccess {
+            val objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." }
+            val payload = images.toList()
+
+            fun consumeDraft() {
                 text = ""
                 images = emptyList()
                 onClearContinueSession()
-                container.hubState.selectedLaneId.value = laneId
-                container.refreshLanes(workspace)
-            }.onFailure { error = it.message }
+            }
+
+            suspend fun enqueueQueued() {
+                runCatching {
+                    container.enqueueRun(
+                        laneId = laneId,
+                        workspace = workspace,
+                        objective = objective,
+                        runMode = runMode,
+                        sessionId = activeSessionId,
+                        images = payload,
+                    )
+                }.onSuccess {
+                    consumeDraft()
+                    container.hubState.selectedLaneId.value = laneId
+                }.onFailure { error = it.message }
+            }
+
+            if (conn is ConnState.Connected) {
+                try {
+                    container.startRun(
+                        laneId = laneId,
+                        workspace = workspace,
+                        objective = objective,
+                        sessionId = activeSessionId,
+                        runMode = runMode,
+                        images = payload,
+                    )
+                    consumeDraft()
+                    container.hubState.selectedLaneId.value = laneId
+                    container.refreshLanes(workspace)
+                } catch (e: ApiException) {
+                    if (e.status == null) {
+                        // Transporte caiu no meio do caminho: o hub nunca recebeu o
+                        // comando — o rascunho vai para a fila durável (Spec 002).
+                        enqueueQueued()
+                    } else {
+                        error = e.message
+                    }
+                } catch (e: Exception) {
+                    error = e.message
+                }
+            } else {
+                // Bridge inacessível: fila durável — envia sozinho quando voltar.
+                enqueueQueued()
+            }
             sending = false
         }
     }

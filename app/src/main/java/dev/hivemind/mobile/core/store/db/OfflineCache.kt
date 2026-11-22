@@ -195,12 +195,14 @@ class OfflineCache(
     suspend fun clear() = dao.clearAll()
 
     companion object {
-        fun build(context: Context, json: Json): OfflineCache {
-            val db = Room.databaseBuilder(context, AppDatabase::class.java, "hivemind-cache.db")
-                // Cache descartável: migração destrutiva em vez de crash no upgrade.
+        /**
+         * Banco único do app (cache descartável: migração destrutiva em vez de
+         * crash no upgrade). AppContainer o constrói uma vez e deriva cache +
+         * fila de envio do mesmo `cacheDao()`.
+         */
+        fun database(context: Context): AppDatabase =
+            Room.databaseBuilder(context, AppDatabase::class.java, "hivemind-cache.db")
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
-            return OfflineCache(db.cacheDao(), json)
-        }
     }
 }

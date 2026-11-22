@@ -1,9 +1,13 @@
 package dev.hivemind.mobile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,10 +47,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import dev.hivemind.mobile.core.connect.ConnectivityService
 import dev.hivemind.mobile.core.relay.KeyRotationNotice
+import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.features.chat.ChatScreen
 import dev.hivemind.mobile.features.diffs.DiffsScreen
 import dev.hivemind.mobile.features.flow.FlowScreen
@@ -78,6 +88,8 @@ class MainActivity : ComponentActivity() {
             HiveMindTheme {
                 val pairing by container.hubState.pairing.collectAsState()
                 val loggedIn by container.relay.loggedIn.collectAsState()
+                NotificationPermissionRequest()
+                BackgroundConnectionBinder(container)
                 KeyRotationDialog(container)
                 when {
                     pairing != null -> MainScaffold(container)
@@ -85,6 +97,47 @@ class MainActivity : ComponentActivity() {
                     else -> GateScreen(container)
                 }
             }
+        }
+    }
+}
+
+/**
+ * POST_NOTIFICATIONS (API 33+): sem a concessão, aprovações pendentes e o
+ * aviso de "equipe concluiu" são silenciosamente descartados pelo sistema.
+ * Pede uma única vez na primeira composição; quem nega mantém o app
+ * funcional — só perde os avisos.
+ */
+@Composable
+private fun NotificationPermissionRequest() {
+    if (Build.VERSION.SDK_INT < 33) return
+    val context = LocalContext.current
+    val alreadyGranted = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.POST_NOTIFICATIONS,
+    ) == PackageManager.PERMISSION_GRANTED
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(alreadyGranted) {
+        if (!alreadyGranted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
+/**
+ * Liga o serviço foreground dataSync quando o bridge está de fato conectado
+ * (start a partir da Activity é permitido em todas as APIs), mantendo o
+ * processo e o stream de eventos vivos com o app em segundo plano; desliga
+ * quando não há mais pareamento ativo.
+ */
+@Composable
+private fun BackgroundConnectionBinder(container: AppContainer) {
+    val context = LocalContext.current
+    val pairing by container.hubState.pairing.collectAsState()
+    val conn by container.hubState.conn.collectAsState()
+    LaunchedEffect(pairing, conn) {
+        if (pairing != null && conn is ConnState.Connected) {
+            runCatching { ConnectivityService.start(context) }
+        } else if (pairing == null) {
+            runCatching { ConnectivityService.stop(context) }
         }
     }
 }
