@@ -1,4 +1,4 @@
-package dev.hivemind.mobile.features.chat
+﻿package dev.hivemind.mobile.features.chat
 
 import android.content.Context
 import android.net.Uri
@@ -37,10 +37,17 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,20 +55,18 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -73,6 +78,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -80,8 +86,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.api.ApiException
 import dev.hivemind.mobile.core.api.ImageInput
@@ -91,44 +99,46 @@ import dev.hivemind.mobile.core.media.prepareImage
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.LaneEventItem
 import dev.hivemind.mobile.core.models.LaneSnapshot
-import dev.hivemind.mobile.core.models.ProviderHealthView
 import dev.hivemind.mobile.core.models.RestoredMessage
 import dev.hivemind.mobile.core.models.SessionDetail
 import dev.hivemind.mobile.core.models.SessionSummary
 import dev.hivemind.mobile.core.outbox.QueuedRun
 import dev.hivemind.mobile.core.outbox.RunQueueState
 import dev.hivemind.mobile.core.state.ConnState
+import dev.hivemind.mobile.theme.ActionPrimary
+import dev.hivemind.mobile.theme.ActionPrimaryText
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.BrandGold
+import dev.hivemind.mobile.theme.BrandGoldBorder
+import dev.hivemind.mobile.theme.BrandGoldSubtle
 import dev.hivemind.mobile.theme.ErrorRed
-import dev.hivemind.mobile.theme.MonoFonts
-import dev.hivemind.mobile.theme.InfoBlue
 import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
+import dev.hivemind.mobile.theme.InfoBlue
 import dev.hivemind.mobile.theme.SuccessGreen
+import dev.hivemind.mobile.theme.SurfaceInput
+import dev.hivemind.mobile.theme.SurfacePanel
+import dev.hivemind.mobile.theme.TextBody
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.theme.TextPrimary
 import dev.hivemind.mobile.ui.EmptyStatePanel
 import dev.hivemind.mobile.ui.ErrorBanner
 import dev.hivemind.mobile.ui.HiveCard
 import dev.hivemind.mobile.ui.StatusPill
 import kotlinx.coroutines.launch
 
-// Modos aceitos pelo bridge (ide/internal/remote/server.go isAllowedRunMode).
 private val RunModes = listOf(
     "auto" to "Auto",
     "direct" to "Direto",
     "plan" to "Planejar",
-    "plan:sdd" to "SDD",
-    "plan:sdd-jira" to "SDD + Jira",
     "squad" to "Squad",
-    "resident" to "Residente",
 )
 
 private val StarterPrompts = listOf(
     "Analisar arquitetura do projeto",
-    "Resumir Ãºltimas alteraÃ§Ãµes",
-    "Encontrar bugs ou pendÃªncias",
+    "Resumir últimas alterações",
+    "Encontrar bugs ou pendências",
 )
 
 sealed class ChatDisplayItem {
@@ -151,7 +161,7 @@ sealed class ChatDisplayItem {
 
 /**
  * Agrupa chunks consecutivos de texto do mesmo autor e chamadas repetidas da mesma ferramenta
- * (Law of Chunking + Miller's Law) para leitura rÃ¡pida no celular.
+ * (Law of Chunking + Miller's Law) para leitura rápida no celular.
  */
 fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
     val out = mutableListOf<ChatDisplayItem>()
@@ -162,7 +172,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 if (e.text.isEmpty()) continue
                 val authorLabel = e.label.ifBlank { e.author }.ifBlank { "Equipe" }
                 val isUser = e.author.equals("user", ignoreCase = true) ||
-                    e.label.equals("VocÃª", ignoreCase = true)
+                    e.label.equals("Você", ignoreCase = true)
                 val prev = out.lastOrNull() as? ChatDisplayItem.TextBubble
                 if (prev != null && prev.authorLabel == authorLabel && prev.isUser == isUser) {
                     out[out.lastIndex] = prev.copy(text = prev.text + e.text)
@@ -171,7 +181,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 }
             }
             "stage" -> {
-                val stage = e.stage.ifBlank { "â€”" }
+                val stage = e.stage.ifBlank { "—" }
                 val prev = out.lastOrNull() as? ChatDisplayItem.StageBadge
                 if (prev?.stage != stage) {
                     out += ChatDisplayItem.StageBadge(stage)
@@ -188,7 +198,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
             }
             "error" -> out += ChatDisplayItem.ErrorItem(e.text)
             "handoff" -> out += ChatDisplayItem.HandoffItem(e.label.ifBlank { "Handoff" })
-            "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "ExecuÃ§Ã£o concluÃ­da." }, e.tokens)
+            "finish" -> out += ChatDisplayItem.FinishItem(e.text.ifBlank { "Execução concluída." }, e.tokens)
             "model_route" -> out += ChatDisplayItem.RouteBadge(e.provider, e.model, e.tier, e.estimatedMicroUsd)
             "provider_failover" -> out += ChatDisplayItem.FailoverItem(
                 fromProvider = e.fromProvider,
@@ -198,7 +208,7 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 reasons = e.reasons,
             )
             "provider_exhausted" -> out += ChatDisplayItem.ErrorItem(
-                e.text.ifBlank { "Todos os provedores de IA estÃ£o esgotados ou sem credencial." },
+                e.text.ifBlank { "Todos os provedores de IA estão esgotados ou sem credencial." },
             )
             else -> if (e.text.isNotBlank()) out += ChatDisplayItem.OtherItem(e.text)
         }
@@ -212,18 +222,20 @@ fun ChatScreen(
     padding: PaddingValues,
     draftSeed: String? = null,
     onConsumeDraftSeed: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {},
+    onOpenFlow: () -> Unit = {},
+    onOpenDiffs: () -> Unit = {},
 ) {
     val workspace by container.hubState.selectedWorkspace.collectAsState()
     val lanesState by container.hubState.lanes.collectAsState()
-    val pairing by container.hubState.pairing.collectAsState()
     val selectedLaneId by container.hubState.selectedLaneId.collectAsState()
-    val providerHealth by container.hubState.providerHealth.collectAsState()
-    val relayGap by container.hubState.relayGap.collectAsState()
 
     if (workspace == null) {
         EmptyStatePanel(
             title = "Nenhum projeto ativo",
-            subtitle = "Escolha um repositÃ³rio na aba Projetos para acompanhar o chat da equipe ou enviar instruÃ§Ãµes.",
+            subtitle = "Abra o menu lateral para escolher um repositório da sua IDE e começar a conversar.",
+            actionLabel = "Escolher projeto",
+            onAction = onOpenDrawer,
             modifier = Modifier.padding(padding),
         )
         return
@@ -260,71 +272,83 @@ fun ChatScreen(
             .padding(padding)
             .imePadding(),
     ) {
-        // CabeÃ§alho compacto com contexto claro (Jakob's Law + Selective Attention)
-        Surface(color = ObsidianCard) {
+        // Cabeçalho minimalista estilo Claude Code mobile (menu + projeto/lane + atalhos)
+        Surface(color = SurfacePanel) {
             Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                        .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
+                    IconButton(
+                        onClick = onOpenDrawer,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Menu,
+                            contentDescription = "Abrir projetos e menu",
+                            tint = TextPrimary,
+                        )
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             projectLeaf,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            pairing?.host?.takeIf { it.isNotBlank() }?.let { "$it Â· $ws" } ?: ws,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextDim,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            LaneSelector(container, lanes, lane)
+                            if ((lane?.turnTokens ?: 0L) > 0L) {
+                                Text(
+                                    "${formatTokens(lane?.turnTokens ?: 0L)} tok",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = BrandGold,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
-                    if ((lane?.turnTokens ?: 0L) > 0L) {
-                        StatusPill(
-                            text = "${formatTokens(lane?.turnTokens ?: 0L)} tok",
-                            color = BrandGold,
-                        )
-                    }
-                    LaneSelector(container, lanes, lane)
                     IconButton(
                         onClick = { historyOpen = true },
                         modifier = Modifier.size(44.dp),
                     ) {
                         Icon(
                             Icons.Filled.DateRange,
-                            contentDescription = "HistÃ³rico de sessÃµes",
+                            contentDescription = "Histórico de sessões",
+                            tint = TextDim,
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenFlow,
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Build,
+                            contentDescription = "Fluxo da equipe",
+                            tint = TextDim,
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenDiffs,
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.List,
+                            contentDescription = "Diffs",
                             tint = TextDim,
                         )
                     }
                 }
                 if (lane != null && (lane.running || lane.stage.isNotBlank())) {
                     PipelineProgressStrip(stage = lane.stage, running = lane.running)
-                }
-                ProviderHealthStrip(health = providerHealth)
-                if (relayGap != null) {
-                    Surface(
-                        onClick = { container.hubState.clearRelayGap() },
-                        color = ApprovalAmber.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                    ) {
-                        Text(
-                            "Relay perdeu eventos â€” histÃ³rico pode ter furos (${relayGap!!.reason}). Toque para dispensar.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ApprovalAmber,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        )
-                    }
                 }
                 HorizontalDivider(color = ObsidianBorder)
             }
@@ -397,8 +421,8 @@ private fun PipelineProgressStrip(stage: String, running: Boolean) {
             val current = idx == activeIdx
             val color = when {
                 current && running -> SuccessGreen
-                current -> BrandGold
-                passed -> BrandGold.copy(alpha = 0.65f)
+                current -> InfoBlue
+                passed -> InfoBlue.copy(alpha = 0.65f)
                 else -> ObsidianBorder
             }
             Surface(
@@ -429,40 +453,6 @@ private fun PipelineProgressStrip(stage: String, running: Boolean) {
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Badges de saÃºde dos provedores (evento `provider_health` do Jev): circuitos
- * abertos/meio-abertos e gasto diÃ¡rio acima de 80% do teto. Sem estados, nada
- * Ã© exibido (SDD D4: destaque sem competiÃ§Ã£o visual).
- */
-@Composable
-private fun ProviderHealthStrip(health: List<ProviderHealthView>) {
-    if (health.isEmpty()) return
-    val alerts = health.mapNotNull { p ->
-        when {
-            p.state.equals("open", true) -> p to ErrorRed
-            p.state.equals("half_open", true) -> p to ApprovalAmber
-            p.dailyCapMicroUsd > 0 && p.dailySpentMicroUsd >= (p.dailyCapMicroUsd * 4) / 5 -> p to ApprovalAmber
-            else -> null
-        }
-    }
-    if (alerts.isEmpty()) return
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        alerts.take(3).forEach { (p, color) ->
-            val label = when {
-                p.state.equals("open", true) -> "${p.provider} Â· circuito aberto"
-                p.state.equals("half_open", true) -> "${p.provider} Â· meio-aberto"
-                else -> "${p.provider} Â· gasto diÃ¡rio ${formatMicroUsd(p.dailySpentMicroUsd)}"
-            }
-            StatusPill(text = label, color = color, showDot = true)
         }
     }
 }
@@ -501,7 +491,7 @@ private fun LaneSelector(
                     color = if (running) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
-                Text("â–¾", style = MaterialTheme.typography.labelSmall, color = TextDim)
+                Text("▾", style = MaterialTheme.typography.labelSmall, color = TextDim)
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -509,7 +499,7 @@ private fun LaneSelector(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "${l.teamName.ifBlank { l.laneId }} ${if (l.running) "â€¢ rodando" else ""}",
+                            "${l.teamName.ifBlank { l.laneId }} ${if (l.running) "• rodando" else ""}",
                             color = if (l.running) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                         )
                     },
@@ -559,9 +549,9 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusPill(text = "AprovaÃ§Ã£o pendente", color = ApprovalAmber, showDot = true)
+            StatusPill(text = "Aprovação pendente", color = ApprovalAmber, showDot = true)
             Text(
-                approval.label.ifBlank { "PermissÃ£o necessÃ¡ria" },
+                approval.label.ifBlank { "Permissão necessária" },
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -612,7 +602,7 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                 },
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
+                    containerColor = InfoBlue,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
                 shape = RoundedCornerShape(10.dp),
@@ -688,9 +678,9 @@ private fun ChatLog(
                     }
                 },
                 containerColor = ObsidianSurface,
-                contentColor = BrandGold,
+                contentColor = InfoBlue,
             ) {
-                Text("â†“", fontWeight = FontWeight.Bold)
+                Text("↓", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -710,17 +700,35 @@ private fun StarterEmptyChat(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Surface(
+                shape = CircleShape,
+                color = BrandGoldSubtle,
+                border = BorderStroke(1.dp, BrandGoldBorder),
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        tint = BrandGold,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
             Text(
-                "Pronto para comeÃ§ar",
-                style = MaterialTheme.typography.titleMedium,
+                "No que vamos trabalhar?",
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+                textAlign = TextAlign.Center,
             )
             Text(
-                "Envie uma instruÃ§Ã£o abaixo ou toque em uma sugestÃ£o para iniciar a equipe:",
+                "Envie uma instrução abaixo ou escolha um atalho para começar:",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextDim,
+                textAlign = TextAlign.Center,
             )
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -732,13 +740,13 @@ private fun StarterEmptyChat(
                         shape = RoundedCornerShape(999.dp),
                         color = ObsidianCard,
                         border = BorderStroke(1.dp, ObsidianBorder),
-                        modifier = Modifier.heightIn(min = 40.dp),
+                        modifier = Modifier.heightIn(min = 44.dp),
                     ) {
                         Box(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(prompt, style = MaterialTheme.typography.labelMedium, color = BrandGold)
+                            Text(prompt, style = MaterialTheme.typography.labelMedium, color = TextBody)
                         }
                     }
                 }
@@ -751,85 +759,182 @@ private fun StarterEmptyChat(
 private fun DisplayItemRow(item: ChatDisplayItem) {
     when (item) {
         is ChatDisplayItem.TextBubble -> {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = if (item.isUser) Arrangement.End else Arrangement.Start,
-            ) {
-                Surface(
-                    color = if (item.isUser) BrandGold.copy(alpha = 0.16f) else ObsidianCard,
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (item.isUser) BrandGold.copy(alpha = 0.40f) else ObsidianBorder,
-                    ),
-                    modifier = Modifier.fillMaxWidth(0.92f),
+            if (item.isUser) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    Surface(
+                        color = ObsidianSurface,
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, ObsidianBorder),
+                        modifier = Modifier.fillMaxWidth(0.84f),
                     ) {
+                        Text(
+                            item.text,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                            color = TextPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            } else {
+                // Resposta do assistente fluida diretamente no fundo (estilo Claude Code)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(BrandGold, CircleShape),
+                        )
                         Text(
                             item.authorLabel,
                             style = MaterialTheme.typography.labelSmall,
                             color = BrandGold,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        Text(item.text, style = MaterialTheme.typography.bodyMedium)
                     }
+                    Text(
+                        item.text,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                        color = TextBody,
+                    )
                 }
             }
         }
         is ChatDisplayItem.StageBadge -> {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                StatusPill(text = "EstÃ¡gio: ${item.stage}", color = TextDim)
+                StatusPill(text = "Estágio · ${item.stage}", color = TextDim)
             }
         }
         is ChatDisplayItem.ToolGroup -> {
-            val label = if (item.count > 1) "${item.toolName} Ã—${item.count}" else item.toolName
+            var expanded by remember(item.toolName, item.count) { mutableStateOf(false) }
+            val isEdit = item.toolName.contains("edit", true) || item.toolName.contains("write", true)
             Surface(
-                color = ObsidianSurface,
-                shape = RoundedCornerShape(8.dp),
+                onClick = { expanded = !expanded },
+                color = ObsidianCard,
+                shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, ObsidianBorder),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    "âš™ $label",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextDim,
-                    fontFamily = MonoFonts,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                )
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            if (isEdit) Icons.Filled.Edit else Icons.Filled.Build,
+                            contentDescription = null,
+                            tint = BrandGold,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            item.toolName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextBody,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (item.count > 1) {
+                            StatusPill(text = "×${item.count}", color = TextDim)
+                        }
+                        Icon(
+                            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Recolher" else "Expandir",
+                            tint = TextDim,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    AnimatedVisibility(visible = expanded) {
+                        Text(
+                            "Ferramenta executada ${item.count} vez(es) nesta etapa (${item.toolName}).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextDim,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
             }
         }
         is ChatDisplayItem.ErrorItem -> {
             ErrorBanner(message = item.text)
         }
         is ChatDisplayItem.HandoffItem -> {
-            Text(
-                "â‡„ ${item.label}",
-                style = MaterialTheme.typography.labelSmall,
-                color = BrandGold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            )
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = null,
+                    tint = BrandGold,
+                    modifier = Modifier.size(13.dp),
+                )
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BrandGold,
+                )
+            }
+        }
+        is ChatDisplayItem.FinishItem -> {
+            Surface(
+                color = SuccessGreen.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = SuccessGreen,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        "${item.text} · ${formatTokens(item.tokens)} tok",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SuccessGreen,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
         }
         is ChatDisplayItem.RouteBadge -> {
             val route = listOfNotNull(
                 item.provider.takeIf { it.isNotBlank() },
                 item.model.takeIf { it.isNotBlank() },
                 item.tier.takeIf { it.isNotBlank() },
-            ).joinToString(" Â· ")
+            ).joinToString(" · ")
             if (route.isNotBlank()) {
                 Text(
                     buildString {
-                        append("â—† IA: ")
+                        append("IA: ")
                         append(route)
-                        if (item.estimatedMicroUsd > 0) append(" Â· ~").append(formatMicroUsd(item.estimatedMicroUsd))
+                        if (item.estimatedMicroUsd > 0) append(" · ~").append(formatMicroUsd(item.estimatedMicroUsd))
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = InfoBlue,
-                    fontFamily = MonoFonts,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
@@ -844,44 +949,25 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                 item.model.takeIf { it.isNotBlank() },
             ).joinToString("/")
             Surface(
-                color = ApprovalAmber.copy(alpha = 0.10f),
+                color = BrandGold.copy(alpha = 0.10f),
                 shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, BrandGold.copy(alpha = 0.35f)),
                 modifier = Modifier.padding(vertical = 2.dp),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                     Text(
-                        "â‡„ Failover${if (from.isNotBlank() && to.isNotBlank()) ": $from â†’ $to" else ""}",
+                        "Failover: ${from.ifBlank { "provedor" }} -> ${to.ifBlank { "próximo" }}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = ApprovalAmber,
-                        fontFamily = MonoFonts,
+                        color = BrandGold,
                     )
-                    item.reasons.firstOrNull()?.takeIf { it.isNotBlank() }?.let {
+                    if (item.reasons.isNotEmpty()) {
                         Text(
-                            it,
-                            style = MaterialTheme.typography.labelSmall,
+                            item.reasons.joinToString("; "),
+                            style = MaterialTheme.typography.bodySmall,
                             color = TextDim,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
-            }
-        }
-        is ChatDisplayItem.FinishItem -> {
-            Surface(
-                color = SuccessGreen.copy(alpha = 0.10f),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.35f)),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    "âœ“ ${item.text} Â· ${formatTokens(item.tokens)} tok",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SuccessGreen,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                )
             }
         }
         is ChatDisplayItem.OtherItem -> {
@@ -890,12 +976,6 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
     }
 }
 
-/**
- * Fila de envio do workspace (Spec 002): objetivos gravados com o bridge
- * inacessível, entregues sozinhos quando a conexão volta e a lane está livre.
- * Estados visíveis — Na fila / Enviando / Falhou — com ação humana apenas no
- * FAILED (SDD D4–D5: destaque sem competir com o chat vivo).
- */
 @Composable
 private fun PendingRunsPanel(
     container: AppContainer,
@@ -975,8 +1055,8 @@ private fun PendingRunRow(container: AppContainer, run: QueuedRun, lane: LaneSna
                         )
                     }
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         OutlinedButton(
                             onClick = {
@@ -1049,9 +1129,9 @@ private fun Composer(
                         images = images + prep.toInput(uri)
                         error = null
                     }
-                    ImagePrep.TooLarge -> error = "A imagem nÃ£o cabe no relay (limite de 12 MiB)."
-                    ImagePrep.Unreadable -> error = "NÃ£o foi possÃ­vel ler a imagem."
-                    null -> error = "NÃ£o foi possÃ­vel ler a imagem."
+                    ImagePrep.TooLarge -> error = "A imagem não cabe no relay (limite de 12 MiB)."
+                    ImagePrep.Unreadable -> error = "Não foi possível ler a imagem."
+                    null -> error = "Não foi possível ler a imagem."
                 }
             }
         }
@@ -1106,8 +1186,6 @@ private fun Composer(
                     container.refreshLanes(workspace)
                 } catch (e: ApiException) {
                     if (e.status == null) {
-                        // Transporte caiu no meio do caminho: o hub nunca recebeu o
-                        // comando — o rascunho vai para a fila durável (Spec 002).
                         enqueueQueued()
                     } else {
                         error = e.message
@@ -1116,79 +1194,69 @@ private fun Composer(
                     error = e.message
                 }
             } else {
-                // Bridge inacessível: fila durável — envia sozinho quando voltar.
                 enqueueQueued()
             }
             sending = false
         }
     }
 
-    Surface(color = ObsidianCard) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            HorizontalDivider(color = ObsidianBorder)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+    var modeMenuOpen by remember { mutableStateOf(false) }
+    val currentModeLabel = RunModes.firstOrNull { it.first == runMode }?.second ?: "Auto"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (error != null) {
+            ErrorBanner(message = error.orEmpty())
+        }
+
+        if (continueSessionId != null) {
+            Surface(
+                color = ApprovalAmber.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(999.dp),
+                border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
             ) {
-                if (error != null) {
-                    ErrorBanner(message = error.orEmpty())
-                }
-
-                if (continueSessionId != null) {
-                    Surface(
-                        color = ApprovalAmber.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(999.dp),
-                        border = BorderStroke(1.dp, ApprovalAmber.copy(alpha = 0.35f)),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-                        ) {
-                            Text(
-                                "Continuando sessÃ£o ${continueSessionId.take(8)}â€¦",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ApprovalAmber,
-                            )
-                            IconButton(
-                                onClick = onClearContinueSession,
-                                modifier = Modifier.size(32.dp),
-                            ) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = "Cancelar continuaÃ§Ã£o",
-                                    tint = ApprovalAmber,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                 ) {
-                    RunModes.forEach { (value, label) ->
-                        FilterChip(
-                            selected = runMode == value,
-                            onClick = { runMode = value },
-                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = BrandGold.copy(alpha = 0.20f),
-                                selectedLabelColor = BrandGold,
-                            ),
+                    Text(
+                        "Continuando sessão ${continueSessionId.take(8)}…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ApprovalAmber,
+                    )
+                    IconButton(
+                        onClick = onClearContinueSession,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Cancelar continuação",
+                            tint = ApprovalAmber,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
+            }
+        }
 
+        // Composer em pill flutuante estilo Claude Code mobile
+        Surface(
+            color = SurfaceInput,
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, ObsidianBorder),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 if (images.isNotEmpty()) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        modifier = Modifier
+                            .padding(start = 12.dp, end = 12.dp, top = 10.dp)
+                            .horizontalScroll(rememberScrollState()),
                     ) {
                         images.forEachIndexed { i, img ->
                             Surface(
@@ -1220,10 +1288,36 @@ private fun Composer(
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("Peça algo ao HiveMind…", color = TextDim) },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = BrandGold,
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Send,
+                    ),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (lane?.running != true) submitRun()
+                    }),
+                    maxLines = 5,
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 6.dp, end = 8.dp, bottom = 6.dp),
                 ) {
                     IconButton(
                         onClick = {
@@ -1231,7 +1325,7 @@ private fun Composer(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                     ) {
                         Icon(
                             Icons.Filled.AddCircle,
@@ -1239,57 +1333,59 @@ private fun Composer(
                             tint = TextDim,
                         )
                     }
-                    OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        placeholder = { Text("InstruÃ§Ã£o para a equipeâ€¦", color = TextDim) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BrandGold,
-                            unfocusedBorderColor = ObsidianBorder,
-                            focusedContainerColor = ObsidianSurface,
-                            unfocusedContainerColor = ObsidianSurface,
-                        ),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            imeAction = ImeAction.Send,
-                        ),
-                        keyboardActions = KeyboardActions(onSend = {
-                            if (lane?.running != true) submitRun()
-                        }),
-                        maxLines = 4,
-                    )
-                    if (lane?.running != true) {
-                        FilledIconButton(
-                            onClick = { submitRun() },
-                            enabled = !sending && (text.isNotBlank() || images.isNotEmpty()),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = BrandGold,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                disabledContainerColor = ObsidianSurface,
-                                disabledContentColor = TextDim,
-                            ),
-                            modifier = Modifier.size(48.dp),
+
+                    Box {
+                        Surface(
+                            onClick = { modeMenuOpen = true },
+                            shape = RoundedCornerShape(999.dp),
+                            color = ObsidianSurface,
+                            border = BorderStroke(1.dp, ObsidianBorder),
+                            modifier = Modifier.heightIn(min = 36.dp),
                         ) {
-                            if (sending) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    currentModeLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = BrandGold,
+                                    fontWeight = FontWeight.Medium,
                                 )
-                            } else {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = "Escolher modo",
+                                    tint = TextDim,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = modeMenuOpen,
+                            onDismissRequest = { modeMenuOpen = false },
+                        ) {
+                            RunModes.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            label,
+                                            color = if (runMode == value) BrandGold else TextPrimary,
+                                            fontWeight = if (runMode == value) FontWeight.SemiBold else FontWeight.Normal,
+                                        )
+                                    },
+                                    onClick = {
+                                        runMode = value
+                                        modeMenuOpen = false
+                                    },
+                                )
                             }
                         }
                     }
-                }
 
-                if (lane?.running == true) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    Spacer(Modifier.weight(1f))
+
+                    if (lane?.running == true) {
                         OutlinedButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1299,16 +1395,24 @@ private fun Composer(
                             },
                             border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.50f)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 44.dp),
+                            shape = RoundedCornerShape(999.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            modifier = Modifier.heightIn(min = 40.dp),
                         ) {
-                            Text("â–  Parar", fontWeight = FontWeight.SemiBold)
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Parar", style = MaterialTheme.typography.labelMedium)
                         }
-                        Button(
-                            onClick = {
-                                if (text.isBlank() && images.isEmpty()) return@Button
+                    }
+
+                    FilledIconButton(
+                        onClick = {
+                            if (lane?.running == true) {
+                                if (text.isBlank() && images.isEmpty()) return@FilledIconButton
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 container.appScope.launch {
                                     val laneId = lane.laneId
@@ -1328,18 +1432,31 @@ private fun Composer(
                                         images = emptyList()
                                     }.onFailure { error = it.message }
                                 }
-                            },
-                            enabled = text.isNotBlank() || images.isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = BrandGold,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 44.dp),
-                        ) {
-                            Text("Redirecionar", fontWeight = FontWeight.SemiBold)
+                            } else {
+                                submitRun()
+                            }
+                        },
+                        enabled = !sending && (text.isNotBlank() || images.isNotEmpty()),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = ActionPrimary,
+                            contentColor = ActionPrimaryText,
+                            disabledContainerColor = ObsidianSurface,
+                            disabledContentColor = TextDim,
+                        ),
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        if (sending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = ActionPrimaryText,
+                            )
+                        } else {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = if (lane?.running == true) "Redirecionar" else "Enviar",
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                 }
@@ -1369,7 +1486,7 @@ private fun SessionHistoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("SessÃµes do projeto", fontWeight = FontWeight.SemiBold) },
+        title = { Text("Sessões do projeto", fontWeight = FontWeight.SemiBold) },
         text = {
             when {
                 loading -> Box(
@@ -1379,7 +1496,7 @@ private fun SessionHistoryDialog(
                     CircularProgressIndicator()
                 }
                 error != null -> ErrorBanner(message = error.orEmpty())
-                sessions.isEmpty() -> Text("Nenhuma sessÃ£o salva ainda.", color = TextDim)
+                sessions.isEmpty() -> Text("Nenhuma sessão salva ainda.", color = TextDim)
                 else -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1397,7 +1514,7 @@ private fun SessionHistoryDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                "${s.updatedAt.take(16).replace('T', ' ')} Â· ${formatTokens(s.totalTokens)} tok",
+                                "${s.updatedAt.take(16).replace('T', ' ')} · ${formatTokens(s.totalTokens)} tok",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextDim,
                             )
@@ -1435,7 +1552,7 @@ private fun SessionHistoryDialog(
 private fun SessionDetailDialog(session: SessionDetail, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(session.title.ifBlank { "SessÃ£o ${session.id.take(8)}" }) },
+        title = { Text(session.title.ifBlank { "Sessão ${session.id.take(8)}" }) },
         text = {
             Column(
                 modifier = Modifier
@@ -1445,9 +1562,9 @@ private fun SessionDetailDialog(session: SessionDetail, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "Entrada ${formatTokens(session.inputTokens)} Â· SaÃ­da ${formatTokens(session.outputTokens)} Â· Total ${formatTokens(session.totalTokens)}",
+                    "Entrada ${formatTokens(session.inputTokens)} · Saída ${formatTokens(session.outputTokens)} · Total ${formatTokens(session.totalTokens)}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = BrandGold,
+                    color = InfoBlue,
                 )
                 HorizontalDivider(color = ObsidianBorder)
                 session.messages.forEach { m -> RestoredRow(m) }
@@ -1465,7 +1582,7 @@ private fun RestoredRow(m: RestoredMessage) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = when (m.kind) {
-                "user" -> BrandGold
+                "user" -> InfoBlue
                 "chief" -> SuccessGreen
                 else -> TextDim
             },
@@ -1502,7 +1619,7 @@ fun formatTokens(tokens: Long): String {
     return tokens.toString()
 }
 
-/** Micro-USD do Jev em formato legÃ­vel: 12_300 â†’ "$0.0123". */
+/** Micro-USD do Jev em formato legível: 12_300 -> "$0.0123". */
 fun formatMicroUsd(microUsd: Long): String {
     val usd = microUsd / 1_000_000.0
     return when {
