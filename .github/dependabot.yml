@@ -5,8 +5,33 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      androidx-camera:
+        patterns:
+          - "androidx.camera:*"
+      androidx-room:
+        patterns:
+          - "androidx.room:*"
+      kotlin-plugins:
+        patterns:
+          - "org.jetbrains.kotlin.*"
+          - "com.google.devtools.ksp"
+    ignore:
+      # Majors de AGP/Kotlin quebram o toolchain — sobe só com bump manual coordenado.
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.android"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.plugin.compose"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.plugin.serialization"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
