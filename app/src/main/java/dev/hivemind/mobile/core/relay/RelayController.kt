@@ -241,7 +241,14 @@ class RelayController(
         session.load(id, vault)
         accountsFlow.value = vault.listAccounts()
         errorFlow.value = null
-        if (session.refreshToken.isNullOrBlank()) {
+        val access = session.accessToken
+        val refresh = session.refreshToken
+        // Same gate as load(): refuse non-hmr_* vault blobs before any Bearer/WebSocket use.
+        if (refresh.isNullOrBlank() ||
+            !refresh.startsWith("hmr_rt_") ||
+            (access != null && !access.startsWith("hmr_at_"))
+        ) {
+            session.wipe()
             activeFlow.value = null
             loggedInFlow.value = false
             selectedFlow.value = null
