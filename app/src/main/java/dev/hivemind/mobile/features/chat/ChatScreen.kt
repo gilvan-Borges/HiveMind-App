@@ -1,4 +1,4 @@
-﻿package dev.hivemind.mobile.features.chat
+package dev.hivemind.mobile.features.chat
 
 import android.content.Context
 import android.net.Uri
@@ -935,12 +935,14 @@ private fun Composer(
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         container.appScope.launch {
             val laneId = lane?.laneId ?: "lane-mobile"
+            val activeSessionId = continueSessionId?.takeIf { it.isNotBlank() }
+                ?: lane?.sessionId?.takeIf { it.isNotBlank() }
             runCatching {
                 container.startRun(
                     laneId = laneId,
                     workspace = workspace,
                     objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." },
-                    sessionId = continueSessionId,
+                    sessionId = activeSessionId,
                     runMode = runMode,
                     images = images,
                 )
