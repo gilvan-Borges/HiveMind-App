@@ -132,17 +132,31 @@ fun MainScaffold(container: AppContainer) {
     var refreshingProjects by remember { mutableStateOf(false) }
     var unpairConfirm by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        refreshingProjects = true
-        container.refreshProjects()
-        container.refreshLanes()
-        if (container.hubState.selectedWorkspace.value == null) {
-            container.hubState.projects.value.firstOrNull()?.let { first ->
-                container.hubState.selectedWorkspace.value = first.workspace
+    suspend fun syncWorkspaceSelection() {
+        val currentProjects = container.hubState.projects.value
+        val currentWorkspace = container.hubState.selectedWorkspace.value
+        if (currentWorkspace == null || currentProjects.none { it.workspace == currentWorkspace }) {
+            val first = currentProjects.firstOrNull()
+            if (currentWorkspace != first?.workspace) {
+                container.hubState.selectedLaneId.value = null
+            }
+            container.hubState.selectedWorkspace.value = first?.workspace
+            if (first != null) {
                 container.refreshLanes(first.workspace)
             }
         }
+    }
+
+    LaunchedEffect(pairing?.activeUrl) {
+        refreshingProjects = true
+        container.refreshProjects()
+        container.refreshLanes()
+        syncWorkspaceSelection()
         refreshingProjects = false
+    }
+
+    LaunchedEffect(projects) {
+        syncWorkspaceSelection()
     }
 
     ModalNavigationDrawer(
@@ -184,6 +198,7 @@ fun MainScaffold(container: AppContainer) {
                                     refreshingProjects = true
                                     container.refreshProjects()
                                     container.refreshLanes()
+                                    syncWorkspaceSelection()
                                     refreshingProjects = false
                                 }
                             },

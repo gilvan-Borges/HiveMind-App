@@ -183,6 +183,8 @@ class AppContainer(context: Context) {
         hubState.setPairing(null)
         hubState.setProjects(emptyList())
         hubState.setLanes(emptyList())
+        hubState.selectedWorkspace.value = null
+        hubState.selectedLaneId.value = null
     }
 
     private fun scheduleRebind() {
@@ -220,6 +222,8 @@ class AppContainer(context: Context) {
             hubState.setPairing(null)
             hubState.setProjects(emptyList())
             hubState.setLanes(emptyList())
+            hubState.selectedWorkspace.value = null
+            hubState.selectedLaneId.value = null
             hubState.conn.value = ConnState.Disconnected
         }
     }

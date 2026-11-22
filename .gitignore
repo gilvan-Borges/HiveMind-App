@@ -16,3 +16,6 @@ screen_check.png
 
 # APK binário vai para GitHub Releases (gh release create)
 /dist/
+
+# HiveMind
+.hivemind/
