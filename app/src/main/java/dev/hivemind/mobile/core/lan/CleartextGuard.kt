@@ -27,6 +27,11 @@ object CleartextGuard {
         if (':' !in host && !isIpv4Literal(host)) return false
         // Literal de IP: InetAddress.getByName não faz rede para literais.
         val addr = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return false
+        // IPv6: só loopback (::1). Site-local/ULA não entram na política documentada
+        // (RFC1918 IPv4 + Tailscale 100.64/10); evita ampliar cleartext além do Spec.
+        if (addr.address?.size != 4) {
+            return addr.isLoopbackAddress
+        }
         if (addr.isLoopbackAddress || addr.isSiteLocalAddress) return true
         return inTailscaleRange(addr)
     }
