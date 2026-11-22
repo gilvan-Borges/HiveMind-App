@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -65,23 +66,24 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -105,6 +107,9 @@ import dev.hivemind.mobile.core.models.SessionSummary
 import dev.hivemind.mobile.core.outbox.QueuedRun
 import dev.hivemind.mobile.core.outbox.RunQueueState
 import dev.hivemind.mobile.core.state.ConnState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import dev.hivemind.mobile.theme.ActionPrimary
 import dev.hivemind.mobile.theme.ActionPrimaryText
 import dev.hivemind.mobile.theme.ApprovalAmber
@@ -276,6 +281,8 @@ fun ChatScreen(
     var sessionDetail by remember { mutableStateOf<SessionDetail?>(null) }
     var continueSessionId by remember { mutableStateOf<String?>(null) }
     var quickSeed by remember { mutableStateOf<String?>(null) }
+    // Covers the gap between POST /runs/start Accepted and SSE running=true.
+    var runPending by remember { mutableStateOf(false) }
 
     LaunchedEffect(ws) {
         if (container.hubState.selectedLaneId.value == null) {
@@ -369,8 +376,34 @@ fun ChatScreen(
                         )
                     }
                 }
-                if (lane != null && lane.running) {
-                    PipelineProgressStrip(stage = lane.stage, running = true)
+                val busy = runPending || (lane?.running == true)
+                if (busy) {
+                    PipelineProgressStrip(stage = lane?.stage.orEmpty(), running = true)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = BrandGold,
+                        )
+                        Text(
+                            when {
+                                lane?.running == true && lane.stage.isNotBlank() ->
+                                    "Equipe a trabalhar · ${lane.stage}"
+                                lane?.running == true -> "Equipe a trabalhar…"
+                                else -> "A iniciar a equipe…"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = BrandGold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 HorizontalDivider(color = ObsidianBorder)
             }
@@ -393,14 +426,17 @@ fun ChatScreen(
 
         PendingRunsPanel(container = container, workspace = ws, lane = lane)
 
+        // Pass laneId only — Composer collects running/session via distinctUntilChanged
+        // so SSE chat spam does not rebuild the text field on every keystroke parent pass.
         Composer(
             container = container,
             workspace = ws,
-            lane = lane,
+            laneId = lane?.laneId ?: "lane-mobile",
             continueSessionId = continueSessionId,
             onClearContinueSession = { continueSessionId = null },
             seedText = quickSeed,
             onConsumeSeed = { quickSeed = null },
+            onRunPendingChange = { runPending = it },
         )
     }
 
@@ -1118,20 +1154,54 @@ private fun PendingRunRow(container: AppContainer, run: QueuedRun, lane: LaneSna
 private fun Composer(
     container: AppContainer,
     workspace: String,
-    lane: LaneSnapshot?,
+    laneId: String,
     continueSessionId: String?,
     onClearContinueSession: () -> Unit,
     seedText: String?,
     onConsumeSeed: () -> Unit,
+    onRunPendingChange: (Boolean) -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
     var runMode by remember { mutableStateOf("auto") }
     var images by remember { mutableStateOf<List<ImageInput>>(emptyList()) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var stickySessionId by remember(laneId) { mutableStateOf<String?>(null) }
     val conn by container.hubState.conn.collectAsState()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val laneKey = "$workspace|$laneId"
+
+    val running by produceState(initialValue = false, laneKey) {
+        container.hubState.lanes
+            .map { it[laneKey]?.running == true }
+            .distinctUntilChanged()
+            .collect { value = it }
+    }
+    val boundSessionId by produceState(initialValue = "", laneKey) {
+        container.hubState.lanes
+            .map { it[laneKey]?.sessionId.orEmpty() }
+            .distinctUntilChanged()
+            .collect { value = it }
+    }
+
+    LaunchedEffect(boundSessionId) {
+        if (boundSessionId.isNotBlank()) stickySessionId = boundSessionId
+    }
+    LaunchedEffect(running) {
+        if (running) {
+            sending = false
+            onRunPendingChange(false)
+        }
+    }
+    LaunchedEffect(sending) {
+        if (!sending) return@LaunchedEffect
+        delay(12_000)
+        if (!running) {
+            sending = false
+            onRunPendingChange(false)
+        }
+    }
 
     LaunchedEffect(seedText) {
         if (!seedText.isNullOrBlank()) {
@@ -1160,14 +1230,15 @@ private fun Composer(
     }
 
     fun submitRun() {
-        if ((text.isBlank() && images.isEmpty()) || sending) return
+        if ((text.isBlank() && images.isEmpty()) || sending || running) return
         sending = true
         error = null
+        onRunPendingChange(true)
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         container.appScope.launch {
-            val laneId = lane?.laneId ?: "lane-mobile"
             val activeSessionId = continueSessionId?.takeIf { it.isNotBlank() }
-                ?: lane?.sessionId?.takeIf { it.isNotBlank() }
+                ?: stickySessionId?.takeIf { it.isNotBlank() }
+                ?: boundSessionId.takeIf { it.isNotBlank() }
             val objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." }
             val payload = images.toList()
 
@@ -1190,7 +1261,13 @@ private fun Composer(
                 }.onSuccess {
                     consumeDraft()
                     container.hubState.selectedLaneId.value = laneId
-                }.onFailure { error = it.message }
+                    sending = false
+                    onRunPendingChange(false)
+                }.onFailure {
+                    error = it.message
+                    sending = false
+                    onRunPendingChange(false)
+                }
             }
 
             if (conn is ConnState.Connected) {
@@ -1205,20 +1282,23 @@ private fun Composer(
                     )
                     consumeDraft()
                     container.hubState.selectedLaneId.value = laneId
-                    container.refreshLanes(workspace)
+                    // Keep sending/runPending until SSE sets running (or timeout).
                 } catch (e: ApiException) {
                     if (e.status == null) {
                         enqueueQueued()
                     } else {
                         error = e.message
+                        sending = false
+                        onRunPendingChange(false)
                     }
                 } catch (e: Exception) {
                     error = e.message
+                    sending = false
+                    onRunPendingChange(false)
                 }
             } else {
                 enqueueQueued()
             }
-            sending = false
         }
     }
 
@@ -1310,28 +1390,37 @@ private fun Composer(
                     }
                 }
 
-                TextField(
+                // BasicTextField: Material TextField recomposes heavily when the parent
+                // chat lane updates over SSE; this keeps typing snappy.
+                BasicTextField(
                     value = text,
                     onValueChange = { text = it },
-                    placeholder = { Text("Peça algo ao HiveMind…", color = TextDim) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = BrandGold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .heightIn(min = 24.dp, max = 120.dp),
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
                     ),
+                    cursorBrush = SolidColor(BrandGold),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Send,
                     ),
                     keyboardActions = KeyboardActions(onSend = {
-                        if (lane?.running != true) submitRun()
+                        if (!running) submitRun()
                     }),
                     maxLines = 5,
+                    decorationBox = { inner ->
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            if (text.isEmpty()) {
+                                Text("Peça algo ao HiveMind…", color = TextDim, fontSize = 16.sp)
+                            }
+                            inner()
+                        }
+                    },
                 )
 
                 Row(
@@ -1407,12 +1496,12 @@ private fun Composer(
 
                     Spacer(Modifier.weight(1f))
 
-                    if (lane?.running == true) {
+                    if (running) {
                         OutlinedButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 container.appScope.launch {
-                                    runCatching { container.api.cancel(lane.laneId) }
+                                    runCatching { container.api.cancel(laneId) }
                                 }
                             },
                             border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.50f)),
@@ -1433,18 +1522,19 @@ private fun Composer(
 
                     FilledIconButton(
                         onClick = {
-                            if (lane?.running == true) {
+                            if (running) {
                                 if (text.isBlank() && images.isEmpty()) return@FilledIconButton
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 container.appScope.launch {
-                                    val laneId = lane.laneId
+                                    val sid = stickySessionId?.takeIf { it.isNotBlank() }
+                                        ?: boundSessionId.takeIf { it.isNotBlank() }
                                     runCatching {
                                         container.api.redirect(
                                             RunStartRequest(
                                                 laneId = laneId,
                                                 workspace = workspace,
                                                 objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." },
-                                                sessionId = lane.sessionId.ifBlank { null },
+                                                sessionId = sid,
                                                 runMode = runMode,
                                                 images = images,
                                             ),
@@ -1476,7 +1566,7 @@ private fun Composer(
                         } else {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
-                                contentDescription = if (lane?.running == true) "Redirecionar" else "Enviar",
+                                contentDescription = if (running) "Redirecionar" else "Enviar",
                                 modifier = Modifier.size(18.dp),
                             )
                         }

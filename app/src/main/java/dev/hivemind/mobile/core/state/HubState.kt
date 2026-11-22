@@ -155,7 +155,12 @@ class HubState(private val json: Json) {
         var stage = snapshot.stage
         var lastError = snapshot.lastError
         var turnTokens = snapshot.turnTokens
+        var sessionId = snapshot.sessionId
         when (e.kind) {
+            "session" -> {
+                val sid = e.text.orEmpty().trim()
+                if (sid.isNotBlank()) sessionId = sid
+            }
             "stage" -> {
                 running = true
                 stage = e.stage.orEmpty()
@@ -193,10 +198,15 @@ class HubState(private val json: Json) {
                 approvals = approvals.filterNot { it.approvalId == id }
             }
         }
-        val recent = if (e.kind == "usage") snapshot.recentEvents else snapshot.recentEvents.takeLast(59) + item
+        val recent = if (e.kind == "usage" || e.kind == "session") {
+            snapshot.recentEvents
+        } else {
+            snapshot.recentEvents.takeLast(59) + item
+        }
         setLane(
             snapshot.copy(
                 teamName = if (ev.team.isNotBlank()) ev.team else snapshot.teamName,
+                sessionId = sessionId,
                 running = running,
                 stage = stage,
                 lastError = lastError,
