@@ -35,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -162,9 +163,34 @@ fun MainScaffold(container: AppContainer) {
     var tab by remember { mutableStateOf(MainTab.Projects) }
     var chatDraftSeed by remember { mutableStateOf<String?>(null) }
     val workspace by container.hubState.selectedWorkspace.collectAsState()
+    val projects by container.hubState.projects.collectAsState()
+    val pairing by container.hubState.pairing.collectAsState()
     val pendingApprovals by container.hubState.pendingApprovals.collectAsState()
     val lanes by container.hubState.lanes.collectAsState()
     val anyRunning = lanes.values.any { it.running }
+
+    LaunchedEffect(pairing?.activeUrl) {
+        container.refreshProjects()
+        container.refreshLanes()
+    }
+
+    LaunchedEffect(pairing?.activeUrl, projects) {
+        val currentWs = container.hubState.selectedWorkspace.value
+        val validSelection = currentWs != null && projects.any { it.workspace == currentWs }
+        if (!validSelection) {
+            val first = projects.firstOrNull()
+            if (first != null) {
+                if (currentWs != first.workspace) {
+                    container.hubState.selectedLaneId.value = null
+                }
+                container.hubState.selectedWorkspace.value = first.workspace
+                container.refreshLanes(first.workspace)
+            } else if (currentWs != null) {
+                container.hubState.selectedWorkspace.value = null
+                container.hubState.selectedLaneId.value = null
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
