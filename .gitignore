@@ -9,13 +9,27 @@ local.properties
 /captures
 .externalNativeBuild
 .cxx
+*.apk
+*.aab
 *.apk.idsig
+*.jks
 *.keystore
-!debug.keystore
+*.pem
+*.key
+.env
+.env.*
+*.sqlite
+*.db
+credentials.json
+api-keys.json
+oauth-session.json
+provider-profiles.json
+relay.json
 screen_check.png
 
-# APK binário vai para GitHub Releases (gh release create)
+# APK binário vai exclusivamente para GitHub Releases (gh release create)
 /dist/
 
 # HiveMind
+/.hivemind
 .hivemind/

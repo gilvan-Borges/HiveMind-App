@@ -6,9 +6,11 @@
 
 **Comande a equipe HiveMind do PC, em tempo real, pelo Android.**
 
+[![HiveMind-App Android CI](https://github.com/gilvan-Borges/HiveMind-App/actions/workflows/android-ci.yml/badge.svg)](https://github.com/gilvan-Borges/HiveMind-App/actions/workflows/android-ci.yml)
 [![Kotlin 2.1.20](https://img.shields.io/badge/Kotlin-2.1.20-C6A15B?logo=kotlin&logoColor=white)](build.gradle.kts)
 [![Android minSdk 26](https://img.shields.io/badge/Android%20minSdk-26-3DDC84?logo=android&logoColor=white)](app/build.gradle.kts)
 [![versão 0.2.0](https://img.shields.io/badge/vers%C3%A3o-0.2.0-C6A15B)](app/build.gradle.kts)
+[![Licença Apache 2.0](https://img.shields.io/badge/Licen%C3%A7a-Apache_2.0-blue.svg)](LICENSE)
 
 Cliente nativo deste repositório (`HiveMind-App`, rótulo **HiveMind Mobile**, pacote `dev.hivemind.mobile`) para o [HiveMind](https://github.com/gilvan-Borges/hivemind). A equipe de agentes continua no computador. O celular lista os projetos abertos, conversa com as lanes, resolve aprovações, acompanha tasks e pull requests e lê o diff do workspace.
 
@@ -19,10 +21,10 @@ Só Android. O Gradle inclui um único módulo, `:app`. Não há alvo iOS.
 ## O que o app faz
 
 - **Projetos.** Card com nome, branch, stack e equipe ativa. Badge de aprovações pendentes e de lanes rodando. Toque abre o chat; atalhos abrem Fluxo e Diffs.
-- **Chat.** Seletor de lane, eventos ao vivo e modos **Auto**, **Direto**, **Planejar** e **Squad**. Cards **Aprovar** e **Recusar**. **Parar** e **Redirecionar** a lane em execução. Histórico **Sessões do projeto** com **Continuar**. Anexo pelo seletor de fotos do sistema (`PickVisualMedia`, só imagem).
+- **Chat.** Seletor de lane, eventos ao vivo e modos **Auto**, **Direto**, **Planejar**, **SDD**, **SDD + Jira**, **Squad** e **Residente**. Fila de envio durável em Room (`RunOutbox`) que entrega automaticamente quando o PC reconecta. Cards **Aprovar** e **Recusar**. **Parar** e **Redirecionar** a lane em execução. Histórico **Sessões do projeto** com **Continuar** e sincronização automática de sessões removidas na IDE. Anexo pelo seletor de fotos do sistema (`PickVisualMedia`, só imagem).
 - **Fluxo & Jira.** Três abas no projeto selecionado: **Minhas Tasks** (busca por chave, título ou status; **Resolver c/ Equipe**), **PRs** (**Analisar c/ Equipe**, modo `plan`) e **Auto-Review (Sem Merge)** (estado, fila, histórico e **Verificar agora**).
-- **Diffs.** Arquivos com contagem de linhas adicionadas e removidas, visualizador colorido e um atalho que leva o caminho do arquivo para o chat.
-- **Dois transportes.** Pareamento LAN/Tailscale pelo QR `hivemind://pair`, ou conta num relay próprio com túnel `naclbox`. Os dois chegam nas mesmas quatro abas.
+- **Diffs.** Arquivos com contagem de linhas adicionadas e removidas, visualizador colorido, cache offline em Room (`OfflineCache`) e atalho que leva o caminho do arquivo para o chat.
+- **Dois transportes.** Pareamento LAN/Tailscale pelo QR `hivemind://pair?v=2`, ou conta num relay próprio com túnel `naclbox` e verificação TOFU de rotação de chave (`KeyRotationDialog`). Os dois chegam nas mesmas quatro abas.
 
 Na LAN o stream é `GET /api/v1/events` (SSE, `Accept: text/event-stream`), com reconexão em 1 s, 2 s, 4 s… até 30 s. No relay o mesmo tipo de evento chega no WebSocket; o cliente para o SSE antes de abrir o túnel.
 
@@ -205,13 +207,14 @@ O manifesto define `android:usesCleartextTraffic="true"`. O cliente do bridge us
 
 O relay é outro cofre. `KeystoreAccountVault` cifra cada segredo com AES/GCM/NoPadding e uma chave AES de 256 bits no Android Keystore (a chave não sai do keystore). Há um alias por conta (`hm_a_` + SHA-256 do id) e um índice cifrado (`hm_relay_index`) com e-mail, URL e papel, sem os tokens. No cofre da conta ficam `accessToken`, `refreshToken`, `accessExpiresAt`, o par de chaves NaCl (`publicKey` / `privateKey`) e a IDE selecionada. Trocar de conta zera a sessão em memória antes de carregar a outra. **Sair** remove os tokens; **Apagar** a conta apaga as preferências e o alias do Keystore.
 
-`android:allowBackup="false"`. Os logs passam por `Redact`, que mascara `hmlan_`, `hmr_at_`, `hmr_rt_`, `hmr_dev_`, `Bearer` e campos JSON de senha, token e chave privada.
+`android:allowBackup="false"`. Os logs passam por `Redact`, que mascara `hmlan_`, `hmr_at_`, `hmr_rt_`, `hmr_dev_`, `Bearer` e campos JSON de senha, token e chave privada. `MainActivity` solicita `POST_NOTIFICATIONS` no Android 13+ e mantém o `ConnectivityService` (`dataSync`) ativo enquanto houver conexão viva com o PC.
 
-Dois pontos que o código deixa em aberto:
-
-- `ConnectivityService` está no manifesto com `foregroundServiceType="dataSync"`, e `PairingStore` tem a flag `background`. Nenhuma tela chama `ConnectivityService.start` nem `setBackground`.
-- O app declara `POST_NOTIFICATIONS` e só publica a notificação se a permissão já estiver concedida. Não há pedido dessa permissão nas telas.
+Para relatar vulnerabilidades de segurança de forma privada, consulte [SECURITY.md](SECURITY.md).
 
 ## Repositório principal
 
 O motor, a IDE e o Remote Bridge estão em [github.com/gilvan-Borges/hivemind](https://github.com/gilvan-Borges/hivemind). Este repositório é só o app Android.
+
+## Licença
+
+[Apache License 2.0](LICENSE).
