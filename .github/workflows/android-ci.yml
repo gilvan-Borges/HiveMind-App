@@ -4,9 +4,21 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "docs/**"
+      - ".specify/**"
+      - ".agents/**"
+      - "*.md"
+      - "LICENSE"
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - "docs/**"
+      - ".specify/**"
+      - ".agents/**"
+      - "*.md"
+      - "LICENSE"
   workflow_dispatch:
 
 permissions:
