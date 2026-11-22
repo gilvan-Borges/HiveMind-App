@@ -15,6 +15,9 @@ import dev.hivemind.mobile.core.lan.PlainHttp
 import dev.hivemind.mobile.core.lan.StoredLan
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.core.notify.LocalNotifier
+import dev.hivemind.mobile.core.outbox.QueuedRun
+import dev.hivemind.mobile.core.outbox.RunOutbox
+import dev.hivemind.mobile.core.outbox.SystemOutboxClock
 import dev.hivemind.mobile.core.relay.KeystoreAccountVault
 import dev.hivemind.mobile.core.relay.NaClBox
 import dev.hivemind.mobile.core.relay.Redact
@@ -26,11 +29,13 @@ import dev.hivemind.mobile.core.state.HubState
 import dev.hivemind.mobile.core.store.Pairing
 import dev.hivemind.mobile.core.store.PairingStore
 import dev.hivemind.mobile.core.store.db.OfflineCache
+import dev.hivemind.mobile.core.store.db.RunQueueStoreRoom
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,7 +58,9 @@ class AppContainer(context: Context) {
     val notifier = LocalNotifier(context)
     val hubState = HubState(json)
     val api = ApiClient(json, plainHttp)
-    val cache = OfflineCache.build(context, json)
+    private val db = OfflineCache.database(context)
+    val cache = OfflineCache(db.cacheDao(), json)
+    val outbox = RunOutbox(RunQueueStoreRoom(db.cacheDao(), json), SystemOutboxClock())
     val lanNotice = MutableStateFlow<String?>(null)
     private val rebindGate = AtomicBoolean(false)
 
@@ -98,6 +105,17 @@ class AppContainer(context: Context) {
             hubState.lanes.collect { map ->
                 runCatching { cache.saveLanes(map.values.toList()) }
             }
+        }
+
+        // Fila de envio (Spec 002): restaura pendências e drena em cada
+        // mudança de conexão ou de snapshot de lanes — a fila anda sozinha
+        // quando o bridge volta e a lane alvo fica livre.
+        appScope.launch {
+            runCatching { outbox.restore() }
+                .onFailure { Log.w("HiveMind", "fila de envio ilegível: ${it.message}") }
+        }
+        appScope.launch {
+            combine(hubState.conn, hubState.lanes) { _, _ -> Unit }.collect { drainOutbox() }
         }
 
         // Troca 4G ↔ Wi-Fi só no pareamento LAN. O relay tem o próprio backoff.
@@ -312,6 +330,42 @@ class AppContainer(context: Context) {
                 runMode = runMode,
                 images = images,
             ),
+        )
+    }
+
+    /**
+     * Enfileira um objetivo para envio futuro (Spec 002). Usado quando o
+     * bridge está inacessível ou a tentativa direta falhou no transporte.
+     */
+    suspend fun enqueueRun(
+        laneId: String,
+        workspace: String,
+        objective: String,
+        runMode: String,
+        sessionId: String? = null,
+        images: List<dev.hivemind.mobile.core.api.ImageInput> = emptyList(),
+    ): QueuedRun =
+        outbox.enqueue(
+            laneId = laneId,
+            workspace = workspace,
+            objective = objective,
+            runMode = runMode,
+            sessionId = sessionId,
+            images = images,
+        )
+
+    /**
+     * Tenta entregar a fila de envio. Gate: conexão viva + API configurada.
+     * Lane ocupada (run em curso) segura o item até o `finish` re-disparar.
+     */
+    private suspend fun drainOutbox() {
+        val connected = hubState.conn.value is ConnState.Connected && api.isConfigured
+        outbox.tryDrain(
+            connected = connected,
+            isLaneBusy = { ws, laneId -> hubState.lane(ws, laneId)?.running == true },
+            sender = { req ->
+                api.startRun(req).also { refreshLanes(req.workspace) }
+            },
         )
     }
 

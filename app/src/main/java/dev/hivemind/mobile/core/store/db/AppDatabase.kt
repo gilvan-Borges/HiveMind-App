@@ -14,8 +14,9 @@ import androidx.room.RoomDatabase
         LaneEntity::class,
         LaneMessageEntity::class,
         DiffEntity::class,
+        PendingRunEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

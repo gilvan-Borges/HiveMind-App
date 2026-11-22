@@ -1,8 +1,14 @@
 package dev.hivemind.mobile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -59,10 +65,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import dev.hivemind.mobile.core.connect.ConnectivityService
+import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.features.chat.ChatScreen
 import dev.hivemind.mobile.features.diffs.DiffsScreen
 import dev.hivemind.mobile.features.flow.FlowScreen
@@ -105,12 +114,43 @@ class MainActivity : ComponentActivity() {
             HiveMindTheme {
                 val pairing by container.hubState.pairing.collectAsState()
                 val loggedIn by container.relay.loggedIn.collectAsState()
+                NotificationPermissionRequest()
+                BackgroundConnectionBinder(container)
                 when {
                     pairing != null -> MainScaffold(container)
                     loggedIn -> RelayDevicesScreen(container)
                     else -> GateScreen(container)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPermissionRequest() {
+    if (Build.VERSION.SDK_INT < 33) return
+    val context = LocalContext.current
+    val alreadyGranted = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.POST_NOTIFICATIONS,
+    ) == PackageManager.PERMISSION_GRANTED
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(alreadyGranted) {
+        if (!alreadyGranted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
+@Composable
+private fun BackgroundConnectionBinder(container: AppContainer) {
+    val context = LocalContext.current
+    val pairing by container.hubState.pairing.collectAsState()
+    val conn by container.hubState.conn.collectAsState()
+    LaunchedEffect(pairing, conn) {
+        if (pairing != null && conn is ConnState.Connected) {
+            runCatching { ConnectivityService.start(context) }
+        } else if (pairing == null) {
+            runCatching { ConnectivityService.stop(context) }
         }
     }
 }

@@ -433,9 +433,14 @@ private fun DeviceList(
     var showCreate by remember { mutableStateOf(false) }
 
     LaunchedEffect(active?.id) {
+        // Poll com decaimento: 10s no primeiro minuto (setup de vínculo é
+        // hands-on), desacelerando até 60s — presença instantânea via socket
+        // cobre as mudanças no meio; o poll é só reposição de estado.
+        var periodMs = 10_000L
         while (true) {
             runCatching { container.relay.refreshDeviceList() }
-            delay(10_000)
+            delay(periodMs)
+            periodMs = minOf(periodMs * 2, 60_000L)
         }
     }
 

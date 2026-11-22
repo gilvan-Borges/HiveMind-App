@@ -61,6 +61,20 @@ interface CacheDao {
     @Query("SELECT * FROM diffs WHERE workspace = :workspace ORDER BY path")
     suspend fun diffsFor(workspace: String): List<DiffEntity>
 
+    // --- Fila de envio (Spec 002) ---
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPendingRun(run: PendingRunEntity)
+
+    @Query("DELETE FROM pending_runs WHERE id = :id")
+    suspend fun deletePendingRun(id: String)
+
+    @Query("SELECT * FROM pending_runs ORDER BY createdAt")
+    suspend fun pendingRunsAll(): List<PendingRunEntity>
+
+    @Query("DELETE FROM pending_runs")
+    suspend fun clearPendingRuns()
+
     // --- Manutenção ---
 
     @Query("DELETE FROM projects")
@@ -81,5 +95,6 @@ interface CacheDao {
         clearLanes()
         clearMessages()
         clearDiffs()
+        clearPendingRuns()
     }
 }

@@ -58,6 +58,26 @@ data class LaneMessageEntity(
     val at: String,
 )
 
+/**
+ * Objetivo enfileirado para envio futuro (Spec 002): criado quando o bridge
+ * está inacessível, enviado automaticamente quando a conexão volta e a lane
+ * está livre. `SENDING` sobrevivente de um crash é reclassificado como
+ * FAILED no restore — repetir um run sem certeza custa tokens.
+ */
+@Entity(tableName = "pending_runs")
+data class PendingRunEntity(
+    @PrimaryKey val id: String,
+    val workspace: String,
+    val laneId: String,
+    val objective: String,
+    val runMode: String,
+    val sessionId: String,
+    val imagesJson: String,
+    val state: String,
+    val lastError: String,
+    val createdAt: Long,
+)
+
 /** Último diff conhecido de um arquivo num workspace. */
 @Entity(tableName = "diffs", primaryKeys = ["workspace", "path"])
 data class DiffEntity(
