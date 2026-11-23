@@ -113,6 +113,14 @@ class RelayContractTest {
     @Test
     fun `allowlist nao tunela o stream SSE`() {
         assertTrue(RpcAllowlist.allowed("get", "/api/v1/projects/"))
+        assertTrue(RpcAllowlist.allowed("POST", "/api/v1/session/read"))
+        assertTrue(RpcAllowlist.allowed("GET", "/api/v1/approvals"))
+        assertTrue(RpcAllowlist.allowed("POST", "/api/v1/project/permission"))
+        assertTrue(RpcAllowlist.allowed("POST", "/api/v1/git/commit"))
+        assertTrue(RpcAllowlist.allowed("POST", "/api/v1/git/pr"))
+        assertTrue(RpcAllowlist.allowed("GET", "/api/v1/routines"))
+        assertTrue(RpcAllowlist.allowed("POST", "/api/v1/routines/enabled"))
+        assertFalse(RpcAllowlist.allowed("GET", "/api/v1/conversations"))
         assertTrue(RpcAllowlist.allowed("POST", "/api/v1/approvals/resolve"))
         assertFalse(RpcAllowlist.allowed("GET", "/api/v1/events"))
         assertFalse(RpcAllowlist.allowed("GET", "/api/v1/../admin"))

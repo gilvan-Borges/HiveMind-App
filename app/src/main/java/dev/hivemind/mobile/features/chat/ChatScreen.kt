@@ -1,7 +1,9 @@
 package dev.hivemind.mobile.features.chat
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.speech.RecognizerIntent
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -40,7 +42,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
@@ -48,6 +52,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
@@ -120,6 +125,7 @@ import dev.hivemind.mobile.theme.BrandGoldStrong
 import dev.hivemind.mobile.theme.BrandGoldSubtle
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
+import dev.hivemind.mobile.theme.OnPrimary
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
 import dev.hivemind.mobile.theme.InfoBlue
@@ -129,10 +135,16 @@ import dev.hivemind.mobile.theme.SurfacePanel
 import dev.hivemind.mobile.theme.TextBody
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.theme.TextPrimary
+import dev.hivemind.mobile.features.inbox.InboxIndex
+import dev.hivemind.mobile.ui.CircleIconButton
 import dev.hivemind.mobile.ui.EmptyStatePanel
 import dev.hivemind.mobile.ui.ErrorBanner
+import dev.hivemind.mobile.ui.HiveBlob
 import dev.hivemind.mobile.ui.HiveCard
+import dev.hivemind.mobile.ui.MicGlyph
 import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.WaveformGlyph
+import dev.hivemind.mobile.ui.blobColor
 import kotlinx.coroutines.launch
 
 private val RunModes = listOf(
@@ -251,6 +263,76 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
 }
 
 @Composable
+fun ChatThreadPreview() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(dev.hivemind.mobile.theme.ObsidianBg),
+    ) {
+        ConversationHeader(
+            title = "Agent Hive",
+            onBack = {},
+            onHistory = {},
+            onFlow = {},
+            onDiffs = {},
+            onClear = null,
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            DisplayItemRow(ChatDisplayItem.TextBubble("Você", "Blz mais continua um agente hive flutuante ok", true))
+            NovasDivider()
+            DisplayItemRow(
+                ChatDisplayItem.TextBubble(
+                    "Equipe",
+                    "Fechado, o Agent Hive continua flutuante. As conversas dele passam a ser as mesmas da IDE.",
+                    false,
+                ),
+            )
+            RunningAgentCard(
+                lane = LaneSnapshot(laneId = "resident", teamName = "Agent Hive", objective = "Unificado com a IDE", running = true, stage = "em execução"),
+                onOpenFlow = {},
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CircleIconButton(Icons.Filled.Add, "Anexar", {}, tint = TextDim)
+            Surface(
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = ObsidianSurface,
+                border = BorderStroke(1.dp, ObsidianBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Mensagem para Agent Hive",
+                        color = TextDim,
+                        modifier = Modifier.weight(1f),
+                        style = TextStyle(fontSize = 16.sp),
+                    )
+                    MicGlyph(tint = TextDim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                }
+            }
+            Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = SuccessGreen) {
+                Box(contentAlignment = Alignment.Center) {
+                    WaveformGlyph(tint = OnPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ChatScreen(
     container: AppContainer,
     padding: PaddingValues,
@@ -261,6 +343,12 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit = {},
     onOpenFlow: () -> Unit = {},
     onOpenDiffs: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
+    conversationTitle: String? = null,
+    openedSessionId: String? = null,
+    openedLaneId: String? = null,
+    initialRunMode: String? = null,
+    showUnreadDivider: Boolean = false,
 ) {
     val workspace by container.hubState.selectedWorkspace.collectAsState()
     val lanesState by container.hubState.lanes.collectAsState()
@@ -269,31 +357,43 @@ fun ChatScreen(
     if (workspace == null) {
         EmptyStatePanel(
             title = "Nenhum projeto ativo",
-            subtitle = "Abra o menu lateral para escolher um repositório da sua IDE e começar a conversar.",
-            actionLabel = "Escolher projeto",
-            onAction = onOpenDrawer,
+            subtitle = if (onBack != null) "Volte e escolha um projeto." else "Abra o menu para escolher um repositório da IDE.",
+            actionLabel = if (onBack != null) "Voltar" else "Escolher projeto",
+            onAction = { if (onBack != null) onBack() else onOpenDrawer() },
             modifier = Modifier.padding(padding),
         )
         return
     }
     val ws: String = workspace ?: return
 
+    val activity by container.hubState.activity.collectAsState()
     val lanes = lanesState.values.filter { it.workspace == ws }
-    val lane = lanes.firstOrNull { it.laneId == selectedLaneId } ?: lanes.firstOrNull()
+    val lane = if (!openedLaneId.isNullOrBlank()) {
+        lanes.firstOrNull { it.laneId == openedLaneId }
+    } else {
+        lanes.firstOrNull { it.laneId == selectedLaneId } ?: lanes.firstOrNull()
+    }
 
     var historyOpen by remember { mutableStateOf(false) }
     var sessionDetail by remember { mutableStateOf<SessionDetail?>(null) }
-    var continueSessionId by remember { mutableStateOf<String?>(null) }
+    var continueSessionId by remember(openedSessionId) { mutableStateOf(openedSessionId) }
+    var restored by remember(openedSessionId) { mutableStateOf<List<RestoredMessage>>(emptyList()) }
     var quickSeed by remember { mutableStateOf<String?>(null) }
     var quickMode by remember { mutableStateOf<String?>(null) }
     // Covers the gap between POST /runs/start Accepted and SSE running=true.
     var runPending by remember { mutableStateOf(false) }
 
-    LaunchedEffect(ws) {
-        if (container.hubState.selectedLaneId.value == null) {
+    LaunchedEffect(ws, openedLaneId) {
+        if (!openedLaneId.isNullOrBlank()) {
+            container.hubState.selectedLaneId.value = openedLaneId
+        } else if (container.hubState.selectedLaneId.value == null) {
             container.hubState.selectedLaneId.value = lanes.firstOrNull()?.laneId
         }
         container.refreshLanes(ws)
+    }
+    LaunchedEffect(ws, openedSessionId) {
+        val id = openedSessionId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        runCatching { container.api.session(ws, id) }.onSuccess { restored = it.messages }
     }
 
     LaunchedEffect(draftSeed, draftMode) {
@@ -305,7 +405,9 @@ fun ChatScreen(
         }
     }
 
-    val projectLeaf = ws.substringAfterLast('\\').substringAfterLast('/').ifBlank { "Chat" }
+    val projectLeaf = conversationTitle?.takeIf { it.isNotBlank() }
+        ?: ws.substringAfterLast('\\').substringAfterLast('/').ifBlank { "Chat" }
+    val composerLaneId = openedLaneId?.takeIf { it.isNotBlank() } ?: lane?.laneId ?: "lane-mobile"
 
     Column(
         modifier = Modifier
@@ -313,115 +415,65 @@ fun ChatScreen(
             .padding(padding)
             .imePadding(),
     ) {
-        // Cabeçalho minimalista estilo Claude Code mobile (menu + projeto/lane + atalhos)
-        Surface(color = SurfacePanel) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    IconButton(
-                        onClick = onOpenDrawer,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.Menu,
-                            contentDescription = "Abrir projetos e menu",
-                            tint = TextPrimary,
-                        )
+        if (onBack != null) {
+            ConversationHeader(
+                title = projectLeaf,
+                onBack = onBack,
+                onHistory = { historyOpen = true },
+                onFlow = onOpenFlow,
+                onDiffs = onOpenDiffs,
+                onClear = if (lane != null && !lane.running && (lane.recentEvents.isNotEmpty() || lane.lastError.isNotBlank())) {
+                    {
+                        continueSessionId = null
+                        container.clearConversation(ws, lane.laneId)
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            projectLeaf,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            LaneSelector(container, lanes, lane)
-                            if ((lane?.turnTokens ?: 0L) > 0L) {
-                                Text(
-                                    "${formatTokens(lane?.turnTokens ?: 0L)} tok",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = BrandGold,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                    if (lane != null && !lane.running && (lane.recentEvents.isNotEmpty() || lane.lastError.isNotBlank())) {
-                        IconButton(
-                            onClick = {
-                                continueSessionId = null
-                                container.clearConversation(ws, lane.laneId)
-                            },
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.AddCircle,
-                                contentDescription = "Nova conversa (limpar tela)",
-                                tint = BrandGold,
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = { historyOpen = true },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.DateRange,
-                            contentDescription = "Histórico de sessões",
-                            tint = TextDim,
-                        )
-                    }
-                }
-                val busy = runPending || (lane?.running == true)
-                if (busy) {
-                    PipelineProgressStrip(stage = lane?.stage.orEmpty(), running = true)
+                } else {
+                    null
+                },
+            )
+        } else {
+            Surface(color = SurfacePanel) {
+                Column {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = BrandGold,
-                        )
-                        Text(
-                            when {
-                                lane?.running == true && lane.stage.isNotBlank() ->
-                                    "Equipe a trabalhar · ${lane.stage}"
-                                lane?.running == true -> "Equipe a trabalhar…"
-                                else -> "A iniciar a equipe…"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = BrandGold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        IconButton(onClick = onOpenDrawer, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Abrir projetos e menu", tint = TextPrimary)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                projectLeaf,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            LaneSelector(container, lanes, lane)
+                        }
                     }
+                    HorizontalDivider(color = ObsidianBorder)
                 }
-                HorizontalDivider(color = ObsidianBorder)
             }
         }
 
         ApprovalCards(container, lanes, lane)
 
-        if (lane != null) {
+        val showLog = lane != null || restored.isNotEmpty()
+        if (showLog) {
             ChatLog(
                 lane = lane,
+                restored = restored,
+                openedSessionId = openedSessionId,
+                showUnreadDivider = showUnreadDivider,
+                activity = activity?.takeIf { notice ->
+                    notice.laneId == composerLaneId || (openedSessionId != null && notice.sessionId == openedSessionId)
+                },
                 onPickStarter = { quickSeed = it },
+                onOpenFlow = onOpenFlow,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -433,12 +485,13 @@ fun ChatScreen(
 
         PendingRunsPanel(container = container, workspace = ws, lane = lane)
 
-        // Pass laneId only — Composer collects running/session via distinctUntilChanged
-        // so SSE chat spam does not rebuild the text field on every keystroke parent pass.
         Composer(
             container = container,
             workspace = ws,
-            laneId = lane?.laneId ?: "lane-mobile",
+            laneId = composerLaneId,
+            peerName = projectLeaf,
+            initialRunMode = initialRunMode,
+            quietSession = onBack != null,
             continueSessionId = continueSessionId,
             onClearContinueSession = { continueSessionId = null },
             seedText = quickSeed,
@@ -464,6 +517,69 @@ fun ChatScreen(
 
     if (sessionDetail != null) {
         SessionDetailDialog(session = sessionDetail!!, onDismiss = { sessionDetail = null })
+    }
+}
+
+@Composable
+private fun ConversationHeader(
+    title: String,
+    onBack: () -> Unit,
+    onHistory: () -> Unit,
+    onFlow: () -> Unit,
+    onDiffs: () -> Unit,
+    onClear: (() -> Unit)?,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircleIconButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Voltar",
+            onClick = onBack,
+            tint = TextPrimary,
+        )
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = ObsidianSurface,
+                border = BorderStroke(1.dp, ObsidianBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 8.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    HiveBlob(color = blobColor(InboxIndex.avatarSlot(title)), modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Box {
+            CircleIconButton(
+                icon = Icons.Filled.MoreVert,
+                contentDescription = "Mais opções",
+                onClick = { menu = true },
+                tint = TextPrimary,
+            )
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Histórico") }, onClick = { menu = false; onHistory() })
+                DropdownMenuItem(text = { Text("Fluxo da equipe") }, onClick = { menu = false; onFlow() })
+                DropdownMenuItem(text = { Text("Diffs") }, onClick = { menu = false; onDiffs() })
+                if (onClear != null) {
+                    DropdownMenuItem(text = { Text("Limpar tela") }, onClick = { menu = false; onClear() })
+                }
+            }
+        }
     }
 }
 
@@ -685,11 +801,30 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
 
 @Composable
 private fun ChatLog(
-    lane: LaneSnapshot,
+    lane: LaneSnapshot?,
+    restored: List<RestoredMessage>,
+    openedSessionId: String?,
+    showUnreadDivider: Boolean,
+    activity: dev.hivemind.mobile.core.models.ActivityNotice?,
     onPickStarter: (String) -> Unit,
+    onOpenFlow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val displayItems = remember(lane.recentEvents) { coalesceChatEvents(lane.recentEvents) }
+    val displayItems = remember(lane?.recentEvents, lane?.sessionId, restored, openedSessionId) {
+        transcriptFor(
+            restored = restored,
+            live = lane?.recentEvents.orEmpty(),
+            laneSessionId = lane?.sessionId,
+            openedSessionId = openedSessionId,
+        )
+    }
+    var novasAt by remember(openedSessionId) { mutableStateOf(-1) }
+    LaunchedEffect(displayItems.size, showUnreadDivider) {
+        if (showUnreadDivider && novasAt < 0 && displayItems.isNotEmpty()) {
+            novasAt = displayItems.indexOfLast { it is ChatDisplayItem.TextBubble }
+        }
+    }
+    val entries = remember(displayItems, novasAt) { withNovasAt(displayItems, novasAt) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -701,21 +836,21 @@ private fun ChatLog(
         }
     }
 
-    LaunchedEffect(displayItems.size) {
-        if (displayItems.isNotEmpty() && isNearBottom) {
-            listState.animateScrollToItem(displayItems.lastIndex)
+    LaunchedEffect(entries.size) {
+        if (entries.isNotEmpty() && isNearBottom) {
+            listState.animateScrollToItem(entries.lastIndex)
         }
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (lane.lastError.isNotBlank()) {
+            if (!lane?.lastError.isNullOrBlank()) {
                 ErrorBanner(
-                    message = lane.lastError,
+                    message = lane?.lastError.orEmpty(),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
-            if (displayItems.isEmpty()) {
+            if (entries.isEmpty() && lane?.running != true) {
                 StarterEmptyChat(
                     onPickStarter = onPickStarter,
                     modifier = Modifier.fillMaxSize(),
@@ -727,13 +862,24 @@ private fun ChatLog(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(displayItems) { item -> DisplayItemRow(item) }
+                    items(entries.size) { index ->
+                        when (val entry = entries[index]) {
+                            TranscriptEntry.Novas -> NovasDivider()
+                            is TranscriptEntry.Item -> DisplayItemRow(entry.item)
+                        }
+                    }
+                    if (activity != null && activity.phase.isNotBlank()) {
+                        item { ActivityCard(activity) }
+                    }
+                    lane?.takeIf { it.running }?.let { runningLane ->
+                        item { RunningAgentCard(lane = runningLane, onOpenFlow = onOpenFlow) }
+                    }
                 }
             }
         }
 
         AnimatedVisibility(
-            visible = !isNearBottom && displayItems.isNotEmpty(),
+            visible = !isNearBottom && entries.isNotEmpty(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(14.dp),
@@ -741,7 +887,7 @@ private fun ChatLog(
             SmallFloatingActionButton(
                 onClick = {
                     scope.launch {
-                        if (displayItems.isNotEmpty()) listState.animateScrollToItem(displayItems.lastIndex)
+                        if (entries.isNotEmpty()) listState.animateScrollToItem(entries.lastIndex)
                     }
                 },
                 containerColor = ObsidianSurface,
@@ -823,69 +969,121 @@ private fun StarterEmptyChat(
 }
 
 @Composable
+private fun NovasDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f), color = ObsidianBorder)
+        Text(
+            "NOVAS",
+            modifier = Modifier.padding(horizontal = 10.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = InfoBlue,
+            fontWeight = FontWeight.SemiBold,
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), color = ObsidianBorder)
+    }
+}
+
+@Composable
+private fun ActivityCard(activity: dev.hivemind.mobile.core.models.ActivityNotice) {
+    val label = when (activity.phase) {
+        "file" -> "Arquivo"
+        "command" -> "Comando"
+        "test" -> "Teste"
+        else -> "Atividade"
+    }
+    Surface(
+        color = ObsidianCard,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ObsidianBorder),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            StatusPill(text = label, color = InfoBlue, showDot = true)
+            Text(
+                activity.target.ifBlank { activity.tool.ifBlank { label } },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RunningAgentCard(lane: LaneSnapshot, onOpenFlow: () -> Unit) {
+    Surface(
+        color = ObsidianCard,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ObsidianBorder),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HiveBlob(color = blobColor(InboxIndex.avatarSlot(lane.laneId)), modifier = Modifier.size(28.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Equipe", style = MaterialTheme.typography.labelSmall, color = TextDim)
+                    Text(
+                        lane.teamName.ifBlank { lane.objective.ifBlank { "Agentes em execução" } },
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                StatusPill(text = "Em execução", color = SuccessGreen, showDot = true)
+            }
+            if (lane.stage.isNotBlank() || lane.objective.isNotBlank()) {
+                Text(
+                    lane.stage.ifBlank { lane.objective },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextDim,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            OutlinedButton(
+                onClick = onOpenFlow,
+                border = BorderStroke(1.dp, ObsidianBorder),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
+            ) { Text("Ver fluxo") }
+        }
+    }
+}
+
+@Composable
 private fun DisplayItemRow(item: ChatDisplayItem) {
     when (item) {
         is ChatDisplayItem.TextBubble -> {
             if (item.isUser) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    Column(
-                        modifier = Modifier.widthIn(max = 320.dp),
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Surface(
+                        color = SuccessGreen,
+                        shape = RoundedCornerShape(18.dp, 18.dp, 6.dp, 18.dp),
+                        modifier = Modifier.widthIn(max = 300.dp),
                     ) {
                         Text(
-                            "Você",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextDim,
+                            item.text,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                            color = OnPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         )
-                        Surface(
-                            color = ObsidianSurface,
-                            shape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp),
-                            border = BorderStroke(1.dp, BrandGoldBorder),
-                        ) {
-                            Text(
-                                item.text,
-                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
-                                color = TextPrimary,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            )
-                        }
                     }
                 }
             } else {
-                Surface(
-                    color = ObsidianCard,
-                    shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
-                    border = BorderStroke(1.dp, ObsidianBorder),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                    Surface(
+                        color = ObsidianSurface,
+                        shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 6.dp),
+                        modifier = Modifier.widthIn(max = 300.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(BrandGold, CircleShape),
-                            )
-                            Text(
-                                item.authorLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = BrandGoldStrong,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
                         Text(
                             item.text,
                             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                            color = TextBody,
+                            color = TextPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         )
                     }
                 }
@@ -1178,6 +1376,9 @@ private fun Composer(
     container: AppContainer,
     workspace: String,
     laneId: String,
+    peerName: String,
+    initialRunMode: String?,
+    quietSession: Boolean,
     continueSessionId: String?,
     onClearContinueSession: () -> Unit,
     seedText: String?,
@@ -1187,7 +1388,7 @@ private fun Composer(
     onRunPendingChange: (Boolean) -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
-    var runMode by remember { mutableStateOf("auto") }
+    var runMode by remember(initialRunMode) { mutableStateOf(initialRunMode?.ifBlank { null } ?: "auto") }
     var images by remember { mutableStateOf<List<ImageInput>>(emptyList()) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1334,6 +1535,19 @@ private fun Composer(
 
     var modeMenuOpen by remember { mutableStateOf(false) }
     val currentModeLabel = RunModes.firstOrNull { it.first == runMode }?.second ?: "Auto"
+    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!spoken.isNullOrBlank()) text = if (text.isBlank()) spoken else "$text $spoken"
+    }
+    fun startVoice() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Mensagem para $peerName")
+        }
+        runCatching { speechLauncher.launch(intent) }
+            .onFailure { error = "Reconhecimento de voz indisponível neste aparelho." }
+    }
 
     Column(
         modifier = Modifier
@@ -1345,7 +1559,7 @@ private fun Composer(
             ErrorBanner(message = error.orEmpty())
         }
 
-        if (continueSessionId != null) {
+        if (continueSessionId != null && !quietSession) {
             Surface(
                 color = ApprovalAmber.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(999.dp),
@@ -1375,246 +1589,193 @@ private fun Composer(
             }
         }
 
-        // Composer em pill flutuante estilo Claude Code mobile
-        Surface(
-            color = SurfaceInput,
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, ObsidianBorder),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (images.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .padding(start = 12.dp, end = 12.dp, top = 10.dp)
-                            .horizontalScroll(rememberScrollState()),
+        if (runMode != "auto") {
+            Text(
+                "Modo · $currentModeLabel",
+                style = MaterialTheme.typography.labelSmall,
+                color = BrandGold,
+            )
+        }
+        if (images.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            ) {
+                images.forEachIndexed { i, img ->
+                    Surface(
+                        color = ObsidianSurface,
+                        shape = RoundedCornerShape(999.dp),
+                        border = BorderStroke(1.dp, ObsidianBorder),
                     ) {
-                        images.forEachIndexed { i, img ->
-                            Surface(
-                                color = ObsidianSurface,
-                                shape = RoundedCornerShape(999.dp),
-                                border = BorderStroke(1.dp, ObsidianBorder),
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(img.name.ifBlank { "imagem" }, style = MaterialTheme.typography.labelSmall)
+                            IconButton(
+                                onClick = { images = images.filterIndexed { j, _ -> j != i } },
+                                modifier = Modifier.size(32.dp),
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(start = 10.dp, end = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        img.name.ifBlank { "imagem" },
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                    IconButton(
-                                        onClick = { images = images.filterIndexed { j, _ -> j != i } },
-                                        modifier = Modifier.size(32.dp),
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Close,
-                                            contentDescription = "Remover",
-                                            modifier = Modifier.size(15.dp),
-                                        )
-                                    }
-                                }
+                                Icon(Icons.Filled.Close, contentDescription = "Remover", modifier = Modifier.size(15.dp))
                             }
                         }
                     }
                 }
+            }
+        }
 
-                // BasicTextField: Material TextField recomposes heavily when the parent
-                // chat lane updates over SSE; this keeps typing snappy.
-                BasicTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                        .heightIn(min = 24.dp, max = 120.dp),
-                    textStyle = TextStyle(
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        lineHeight = 22.sp,
-                    ),
-                    cursorBrush = SolidColor(BrandGold),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Send,
-                    ),
-                    keyboardActions = KeyboardActions(onSend = {
-                        if (!running) submitRun()
-                    }),
-                    maxLines = 5,
-                    decorationBox = { inner ->
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            if (text.isEmpty()) {
-                                Text("Peça algo ao HiveMind…", color = TextDim, fontSize = 16.sp)
-                            }
-                            inner()
-                        }
-                    },
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box {
+                CircleIconButton(
+                    icon = Icons.Filled.Add,
+                    contentDescription = "Anexar imagem ou escolher modo",
+                    onClick = { modeMenuOpen = true },
+                    tint = TextDim,
                 )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 6.dp, end = 8.dp, bottom = 6.dp),
-                ) {
-                    IconButton(
+                DropdownMenu(expanded = modeMenuOpen, onDismissRequest = { modeMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Anexar imagem") },
                         onClick = {
+                            modeMenuOpen = false
                             imagePicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.AddCircle,
-                            contentDescription = "Anexar imagem",
-                            tint = TextDim,
+                    )
+                    RunModes.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    label,
+                                    color = if (runMode == value) BrandGold else TextPrimary,
+                                    fontWeight = if (runMode == value) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            },
+                            onClick = {
+                                runMode = value
+                                modeMenuOpen = false
+                            },
                         )
                     }
-
-                    Box {
-                        Surface(
-                            onClick = { modeMenuOpen = true },
-                            shape = RoundedCornerShape(999.dp),
-                            color = ObsidianSurface,
-                            border = BorderStroke(1.dp, ObsidianBorder),
-                            modifier = Modifier.heightIn(min = 36.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(
-                                    currentModeLabel,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = BrandGold,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                Icon(
-                                    Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = "Escolher modo",
-                                    tint = TextDim,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = modeMenuOpen,
-                            onDismissRequest = { modeMenuOpen = false },
-                        ) {
-                            RunModes.forEach { (value, label) ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            label,
-                                            color = if (runMode == value) BrandGold else TextPrimary,
-                                            fontWeight = if (runMode == value) FontWeight.SemiBold else FontWeight.Normal,
-                                        )
-                                    },
-                                    onClick = {
-                                        runMode = value
-                                        modeMenuOpen = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.weight(1f))
-
                     if (running) {
-                        OutlinedButton(
+                        DropdownMenuItem(
+                            text = { Text("Parar", color = ErrorRed) },
                             onClick = {
+                                modeMenuOpen = false
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 container.appScope.launch {
                                     runCatching { container.api.cancel(laneId) }
                                 }
                             },
-                            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.50f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                            shape = RoundedCornerShape(999.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier.heightIn(min = 40.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text("Parar", style = MaterialTheme.typography.labelMedium)
-                        }
+                        )
                     }
-
-                    FilledIconButton(
-                        onClick = {
-                            if (running) {
-                                if (text.isBlank() && images.isEmpty()) return@FilledIconButton
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                container.appScope.launch {
-                                    val sid = stickySessionId?.takeIf { it.isNotBlank() }
-                                        ?: boundSessionId.takeIf { it.isNotBlank() }
-                                    val note = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." }
-                                    val restart = RunStartRequest(
-                                        laneId = laneId,
-                                        workspace = workspace,
-                                        objective = note,
-                                        sessionId = sid,
-                                        runMode = runMode,
-                                        images = images,
-                                    )
-                                    runCatching {
-                                        // Texto entra na mesa redonda da execução viva.
-                                        // Imagem, host antigo (404/400) ou run já encerrada (409)
-                                        // ainda reiniciam: o steer não carrega bytes de imagem.
-                                        if (images.isEmpty()) {
-                                            try {
-                                                container.api.steer(laneId, note)
-                                            } catch (e: ApiException) {
-                                                if (e.status == 404 || e.status == 400 || e.status == 409) {
-                                                    container.api.redirect(restart)
-                                                } else {
-                                                    throw e
-                                                }
-                                            }
-                                        } else {
-                                            container.api.redirect(restart)
-                                        }
-                                    }.onSuccess {
-                                        text = ""
-                                        images = emptyList()
-                                    }.onFailure { error = it.message }
+                }
+            }
+            Surface(
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = ObsidianSurface,
+                border = BorderStroke(1.dp, ObsidianBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.weight(1f).heightIn(min = 24.dp, max = 96.dp),
+                        textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp, lineHeight = 22.sp),
+                        cursorBrush = SolidColor(BrandGold),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Send,
+                        ),
+                        keyboardActions = KeyboardActions(onSend = { if (!running) submitRun() }),
+                        maxLines = 4,
+                        decorationBox = { inner ->
+                            Box {
+                                if (text.isEmpty()) {
+                                    Text("Mensagem para $peerName", color = TextDim, fontSize = 16.sp)
                                 }
-                            } else {
-                                submitRun()
+                                inner()
                             }
                         },
-                        enabled = !sending && (text.isNotBlank() || images.isNotEmpty()),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = ActionPrimary,
-                            contentColor = ActionPrimaryText,
-                            disabledContainerColor = ObsidianSurface,
-                            disabledContentColor = TextDim,
-                        ),
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        if (sending) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = ActionPrimaryText,
+                    )
+                    IconButton(onClick = { startVoice() }, modifier = Modifier.size(44.dp)) {
+                        MicGlyph(tint = TextDim, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            val canSend = text.isNotBlank() || images.isNotEmpty()
+            Surface(
+                onClick = click@{
+                    if (sending) return@click
+                    if (!canSend) {
+                        startVoice()
+                        return@click
+                    }
+                    if (running) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        container.appScope.launch {
+                            val sid = stickySessionId?.takeIf { it.isNotBlank() }
+                                ?: boundSessionId.takeIf { it.isNotBlank() }
+                            val note = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." }
+                            val restart = RunStartRequest(
+                                laneId = laneId,
+                                workspace = workspace,
+                                objective = note,
+                                sessionId = sid,
+                                runMode = runMode,
+                                images = images,
                             )
-                        } else {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Send,
-                                contentDescription = if (running) "Enviar nota" else "Enviar",
-                                modifier = Modifier.size(18.dp),
-                            )
+                            runCatching {
+                                if (images.isEmpty()) {
+                                    try {
+                                        container.api.steer(laneId, note)
+                                    } catch (e: ApiException) {
+                                        if (e.status == 404 || e.status == 400 || e.status == 409) {
+                                            container.api.redirect(restart)
+                                        } else {
+                                            throw e
+                                        }
+                                    }
+                                } else {
+                                    container.api.redirect(restart)
+                                }
+                            }.onSuccess {
+                                text = ""
+                                images = emptyList()
+                            }.onFailure { error = it.message }
                         }
+                    } else {
+                        submitRun()
+                    }
+                },
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = SuccessGreen,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (sending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = OnPrimary,
+                        )
+                    } else if (!canSend) {
+                        WaveformGlyph(tint = OnPrimary, modifier = Modifier.size(18.dp))
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = if (running) "Enviar nota" else "Enviar",
+                            tint = OnPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                 }
             }

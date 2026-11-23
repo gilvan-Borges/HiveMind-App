@@ -21,8 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,7 +78,7 @@ fun DiffsScreen(
     if (workspace == null) {
         EmptyStatePanel(
             title = "Nenhum projeto selecionado",
-            subtitle = "Selecione um projeto na aba Projetos para inspecionar os diffs do workspace.",
+            subtitle = "Selecione um projeto na tela inicial para inspecionar os diffs do workspace.",
             modifier = Modifier.padding(padding),
         )
         return
@@ -85,6 +88,12 @@ fun DiffsScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<FileDiff?>(null) }
+    var commitOpen by remember { mutableStateOf(false) }
+    var prOpen by remember { mutableStateOf(false) }
+    var commitMessage by remember { mutableStateOf("") }
+    var prTitle by remember { mutableStateOf("") }
+    var prBody by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
 
     suspend fun load() {
         loading = true
@@ -134,6 +143,8 @@ fun DiffsScreen(
                             )
                         }
                     }
+                    TextButton(onClick = { commitOpen = true }, enabled = files.isNotEmpty() && !busy) { Text("Commit") }
+                    TextButton(onClick = { prOpen = true }, enabled = !busy) { Text("PR") }
                     IconButton(
                         onClick = { container.appScope.launch { load() } },
                         modifier = Modifier.size(48.dp),
@@ -206,6 +217,71 @@ fun DiffsScreen(
                     }
                 }
             }
+        }
+        if (commitOpen) {
+            AlertDialog(
+                onDismissRequest = { if (!busy) commitOpen = false },
+                title = { Text("Commit") },
+                text = {
+                    OutlinedTextField(
+                        value = commitMessage,
+                        onValueChange = { commitMessage = it },
+                        label = { Text("Mensagem") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = commitMessage.isNotBlank() && !busy,
+                        onClick = {
+                            busy = true
+                            container.appScope.launch {
+                                runCatching { container.api.commit(workspace, commitMessage.trim(), false) }
+                                    .onSuccess {
+                                        commitMessage = ""
+                                        commitOpen = false
+                                        load()
+                                    }
+                                    .onFailure { error = it.message }
+                                busy = false
+                            }
+                        },
+                    ) { Text("Commit") }
+                },
+                dismissButton = { TextButton(onClick = { commitOpen = false }) { Text("Cancelar") } },
+            )
+        }
+        if (prOpen) {
+            AlertDialog(
+                onDismissRequest = { if (!busy) prOpen = false },
+                title = { Text("Abrir pull request") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = prTitle, onValueChange = { prTitle = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = prBody, onValueChange = { prBody = it }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth())
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = prTitle.isNotBlank() && !busy,
+                        onClick = {
+                            busy = true
+                            container.appScope.launch {
+                                runCatching { container.api.openPullRequest(workspace, prTitle.trim(), prBody.trim(), "main") }
+                                    .onSuccess {
+                                        prTitle = ""
+                                        prBody = ""
+                                        prOpen = false
+                                        error = it.url.takeIf { url -> url.isNotBlank() }?.let { url -> "PR aberto: $url" }
+                                    }
+                                    .onFailure { error = it.message }
+                                busy = false
+                            }
+                        },
+                    ) { Text("Abrir") }
+                },
+                dismissButton = { TextButton(onClick = { prOpen = false }) { Text("Cancelar") } },
+            )
         }
     }
 }
