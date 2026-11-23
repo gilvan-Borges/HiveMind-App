@@ -1,9 +1,7 @@
 package dev.hivemind.mobile.features.chat
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.speech.RecognizerIntent
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -141,9 +139,7 @@ import dev.hivemind.mobile.ui.EmptyStatePanel
 import dev.hivemind.mobile.ui.ErrorBanner
 import dev.hivemind.mobile.ui.HiveBlob
 import dev.hivemind.mobile.ui.HiveCard
-import dev.hivemind.mobile.ui.MicGlyph
 import dev.hivemind.mobile.ui.StatusPill
-import dev.hivemind.mobile.ui.WaveformGlyph
 import dev.hivemind.mobile.ui.blobColor
 import kotlinx.coroutines.launch
 
@@ -319,13 +315,12 @@ fun ChatThreadPreview() {
                         modifier = Modifier.weight(1f),
                         style = TextStyle(fontSize = 16.sp),
                     )
-                    MicGlyph(tint = TextDim, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                 }
             }
-            Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = SuccessGreen) {
+                    Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = SuccessGreen) {
                 Box(contentAlignment = Alignment.Center) {
-                    WaveformGlyph(tint = OnPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = OnPrimary, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -366,7 +361,7 @@ fun ChatScreen(
     }
     val ws: String = workspace ?: return
 
-    val activity by container.hubState.activity.collectAsState()
+    val activities by container.hubState.activities.collectAsState()
     val lanes = lanesState.values.filter { it.workspace == ws }
     val lane = if (!openedLaneId.isNullOrBlank()) {
         lanes.firstOrNull { it.laneId == openedLaneId }
@@ -469,8 +464,13 @@ fun ChatScreen(
                 restored = restored,
                 openedSessionId = openedSessionId,
                 showUnreadDivider = showUnreadDivider,
-                activity = activity?.takeIf { notice ->
+                activities = activities.filter { notice ->
                     notice.laneId == composerLaneId || (openedSessionId != null && notice.sessionId == openedSessionId)
+                },
+                onStop = {
+                    container.appScope.launch {
+                        runCatching { container.api.cancel(composerLaneId) }
+                    }
                 },
                 onPickStarter = { quickSeed = it },
                 onOpenFlow = onOpenFlow,
@@ -759,7 +759,10 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     container.appScope.launch {
                         runCatching { container.api.resolveApproval(approval.approvalId, false) }
-                            .onSuccess { container.hubState.onApprovalResolved(approval.approvalId) }
+                            .onSuccess {
+                                container.hubState.onApprovalResolved(approval.approvalId)
+                                container.notifier.cancelApproval(approval.approvalId)
+                            }
                         busy = false
                     }
                 },
@@ -779,7 +782,10 @@ private fun ApprovalCard(container: AppContainer, approval: ApprovalInfo) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     container.appScope.launch {
                         runCatching { container.api.resolveApproval(approval.approvalId, true) }
-                            .onSuccess { container.hubState.onApprovalResolved(approval.approvalId) }
+                            .onSuccess {
+                                container.hubState.onApprovalResolved(approval.approvalId)
+                                container.notifier.cancelApproval(approval.approvalId)
+                            }
                         busy = false
                     }
                 },
@@ -805,7 +811,8 @@ private fun ChatLog(
     restored: List<RestoredMessage>,
     openedSessionId: String?,
     showUnreadDivider: Boolean,
-    activity: dev.hivemind.mobile.core.models.ActivityNotice?,
+    activities: List<dev.hivemind.mobile.core.models.ActivityNotice>,
+    onStop: () -> Unit,
     onPickStarter: (String) -> Unit,
     onOpenFlow: () -> Unit,
     modifier: Modifier = Modifier,
@@ -868,8 +875,8 @@ private fun ChatLog(
                             is TranscriptEntry.Item -> DisplayItemRow(entry.item)
                         }
                     }
-                    if (activity != null && activity.phase.isNotBlank()) {
-                        item { ActivityCard(activity) }
+                    if (activities.isNotEmpty()) {
+                        item { ActivityCard(activities, onStop) }
                     }
                     lane?.takeIf { it.running }?.let { runningLane ->
                         item { RunningAgentCard(lane = runningLane, onOpenFlow = onOpenFlow) }
@@ -987,27 +994,53 @@ private fun NovasDivider() {
 }
 
 @Composable
-private fun ActivityCard(activity: dev.hivemind.mobile.core.models.ActivityNotice) {
-    val label = when (activity.phase) {
-        "file" -> "Arquivo"
-        "command" -> "Comando"
-        "test" -> "Teste"
-        else -> "Atividade"
-    }
+private fun ActivityCard(
+    activities: List<dev.hivemind.mobile.core.models.ActivityNotice>,
+    onStop: () -> Unit,
+) {
     Surface(
         color = ObsidianCard,
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, ObsidianBorder),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            StatusPill(text = label, color = InfoBlue, showDot = true)
-            Text(
-                activity.target.ifBlank { activity.tool.ifBlank { label } },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Ao vivo",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                OutlinedButton(
+                    onClick = onStop,
+                    border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.heightIn(min = 44.dp),
+                ) { Text("Parar") }
+            }
+            activities.forEach { activity ->
+                val label = when (activity.phase) {
+                    "file" -> "Arquivo"
+                    "command" -> "Comando"
+                    "test" -> "Teste"
+                    else -> "Atividade"
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    StatusPill(text = label, color = InfoBlue, showDot = true)
+                    Text(
+                        listOfNotNull(
+                            activity.author.takeIf { it.isNotBlank() },
+                            activity.target.ifBlank { activity.tool }.takeIf { it.isNotBlank() },
+                        ).joinToString(" · ").ifBlank { label },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextBody,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
@@ -1535,20 +1568,6 @@ private fun Composer(
 
     var modeMenuOpen by remember { mutableStateOf(false) }
     val currentModeLabel = RunModes.firstOrNull { it.first == runMode }?.second ?: "Auto"
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (!spoken.isNullOrBlank()) text = if (text.isBlank()) spoken else "$text $spoken"
-    }
-    fun startVoice() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Mensagem para $peerName")
-        }
-        runCatching { speechLauncher.launch(intent) }
-            .onFailure { error = "Reconhecimento de voz indisponível neste aparelho." }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1706,19 +1725,12 @@ private fun Composer(
                             }
                         },
                     )
-                    IconButton(onClick = { startVoice() }, modifier = Modifier.size(44.dp)) {
-                        MicGlyph(tint = TextDim, modifier = Modifier.size(18.dp))
-                    }
                 }
             }
             val canSend = text.isNotBlank() || images.isNotEmpty()
             Surface(
                 onClick = click@{
-                    if (sending) return@click
-                    if (!canSend) {
-                        startVoice()
-                        return@click
-                    }
+                    if (sending || !canSend) return@click
                     if (running) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         container.appScope.launch {
@@ -1758,7 +1770,7 @@ private fun Composer(
                 },
                 modifier = Modifier.size(48.dp),
                 shape = CircleShape,
-                color = SuccessGreen,
+                color = if (canSend) SuccessGreen else ObsidianSurface,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (sending) {
@@ -1767,13 +1779,11 @@ private fun Composer(
                             strokeWidth = 2.dp,
                             color = OnPrimary,
                         )
-                    } else if (!canSend) {
-                        WaveformGlyph(tint = OnPrimary, modifier = Modifier.size(18.dp))
                     } else {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = if (running) "Enviar nota" else "Enviar",
-                            tint = OnPrimary,
+                            tint = if (canSend) OnPrimary else TextDim,
                             modifier = Modifier.size(18.dp),
                         )
                     }

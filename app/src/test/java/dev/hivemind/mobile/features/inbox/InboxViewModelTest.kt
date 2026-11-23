@@ -89,6 +89,22 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun ideStatusNamesTransportAndProject() {
+        assertEquals(
+            "IDE online · LAN · acme",
+            InboxIndex.ideStatusLabel(online = true, transport = "lan", project = "acme"),
+        )
+        assertEquals(
+            "IDE offline",
+            InboxIndex.ideStatusLabel(online = false, transport = "", project = ""),
+        )
+        assertEquals(
+            "IDE online · Relay · org-alpha",
+            InboxIndex.ideStatusLabel(true, "relay", "org-alpha"),
+        )
+    }
+
+    @Test
     fun formatsPortugueseTimes() {
         val zone = ZoneOffset.UTC
         val today = InboxIndex.parseActivityMillis("2026-11-23T16:04:00Z")

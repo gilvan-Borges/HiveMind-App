@@ -27,6 +27,15 @@ Contrato real do bridge (`docs/APP_MOBILE_CONTRATO.md` em `gilvan-Borges/hivemin
 - Diffs: `POST /api/v1/git/commit` e `POST /api/v1/git/pr`. Rotinas: `GET /api/v1/routines` e `POST /api/v1/routines/enabled`.
 - Projetos na home agrupam pelo `stack`; vazio vira **Sem seção**. Conversas agrupam em **Agent Hive** e **Equipe**.
 
+## Operação no celular
+
+- Notificação de `approval_required` traz ações **Aprovar** e **Negar** (`ApprovalActionReceiver` → `POST /api/v1/approvals/resolve`). O mesmo pedido continua como card na conversa.
+- Eventos `activity` viram um card ao vivo (arquivo, comando, teste) com **Parar** (`POST /api/v1/runs/cancel`).
+- Diffs: revisar o patch e confirmar commit (`POST /api/v1/git/commit`) ou PR (`POST /api/v1/git/pr`).
+- Pílula no topo da lista: `IDE online|offline`, `transport` e `openProject` de `GET /api/v1/health`.
+- Configurações listam rotinas e pausam/retomam com `POST /api/v1/routines/enabled`.
+- Voz fica de fora desta entrega. O compositor só envia texto.
+
 ## Tokens (D1–D4)
 
 | Papel | Token |

@@ -1,5 +1,6 @@
 package dev.hivemind.mobile.core.state
 
+import dev.hivemind.mobile.core.models.ActivityNotice
 import dev.hivemind.mobile.core.models.LaneEvent
 import dev.hivemind.mobile.core.models.OrchestratorEvent
 import dev.hivemind.mobile.core.models.StreamEvent
@@ -14,6 +15,17 @@ import org.junit.Test
 class HubStateTest {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `atividade ao vivo substitui o mesmo autor e fase`() {
+        val first = ActivityNotice(laneId = "resident", author = "dev", phase = "file", target = "a.kt")
+        val second = ActivityNotice(laneId = "resident", author = "qa", phase = "test", target = "go test")
+        val updated = ActivityNotice(laneId = "resident", author = "dev", phase = "file", target = "b.kt")
+        val kept = rememberActivities(listOf(first, second), updated)
+        assertEquals(2, kept.size)
+        assertEquals("b.kt", kept.last().target)
+        assertEquals("qa", kept.first().author)
+    }
 
     @Test
     fun `lane event cria snapshot e acumula tokens`() {

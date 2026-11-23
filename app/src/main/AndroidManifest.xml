@@ -36,5 +36,9 @@
             android:name=".core.connect.ConnectivityService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".core.notify.ApprovalActionReceiver"
+            android:exported="false" />
     </application>
 </manifest>
