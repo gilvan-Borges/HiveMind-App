@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,7 +25,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,11 +66,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,9 +91,19 @@ import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
+import dev.hivemind.mobile.ui.EntryBackHeader
+import dev.hivemind.mobile.ui.EntryBullet
+import dev.hivemind.mobile.ui.EntryScaffold
+import dev.hivemind.mobile.ui.EntryStep
 import dev.hivemind.mobile.ui.ErrorBanner
+import dev.hivemind.mobile.ui.GoldMark
+import dev.hivemind.mobile.ui.HelpDisclosure
 import dev.hivemind.mobile.ui.HiveCard
-import dev.hivemind.mobile.ui.OnboardingHero
+import dev.hivemind.mobile.ui.IconField
+import dev.hivemind.mobile.ui.PillButton
+import dev.hivemind.mobile.ui.QrHero
+import dev.hivemind.mobile.ui.QuietLink
+import dev.hivemind.mobile.ui.StaticEntry
 import dev.hivemind.mobile.ui.StatusPill
 import dev.hivemind.mobile.ui.edgeInsets
 import kotlinx.coroutines.delay
@@ -93,104 +111,46 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun GateHomePreview() {
-    GateHome(
-        accounts = emptyList(),
-        notice = null,
-        onRemote = {},
-        onLan = {},
-        onAccount = {},
-    )
+    StaticEntry {
+        GateHome(
+            accounts = emptyList(),
+            notice = null,
+            onRemote = {},
+            onLan = {},
+            onAccount = {},
+        )
+    }
 }
 
 @Composable
 fun RelayLoginPreview() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .edgeInsets()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-            Text(
-                "Entrar no relay",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "Use a conta do servidor de relay. Dá para entrar com o QR da IDE ou com e-mail e senha.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextDim,
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = {},
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-        ) { Text("Entrar com QR Code da IDE", fontWeight = FontWeight.SemiBold) }
-        Spacer(Modifier.height(14.dp))
-        HiveCard(contentPadding = PaddingValues(16.dp)) {
-            val fieldColors = dev.hivemind.mobile.ui.hiveFieldColors()
-            OutlinedTextField(
-                value = "https://",
-                onValueChange = {},
-                label = { Text("URL do relay (https)") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = "",
-                onValueChange = {},
-                label = { Text("E-mail ou usuário") },
-                placeholder = { Text("conta@example.com") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = "",
-                onValueChange = {},
-                label = { Text("Senha") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = {},
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-            ) { Text("Entrar", fontWeight = FontWeight.SemiBold) }
-        }
-        dev.hivemind.mobile.ui.HelpDisclosure(
-            "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
-        )
-    }
+    StaticEntry { RelayEntryPreview(emailOpen = false) }
+}
+
+@Composable
+fun RelayLoginEmailPreview() {
+    StaticEntry { RelayEntryPreview(emailOpen = true, showPassword = true, password = "senha-exemplo") }
+}
+
+@Composable
+private fun RelayEntryPreview(emailOpen: Boolean, showPassword: Boolean = false, password: String = "") {
+    RelayEntry(
+        relayUrl = "https://relay.example.com",
+        email = if (emailOpen) "conta@example.com" else "",
+        password = password,
+        showPassword = showPassword,
+        emailOpen = emailOpen,
+        busy = false,
+        error = null,
+        onRelayUrl = {},
+        onEmail = {},
+        onPassword = {},
+        onTogglePassword = {},
+        onToggleEmail = {},
+        onScan = {},
+        onSubmit = {},
+        onBack = {},
+    )
 }
 
 @Composable
@@ -224,94 +184,90 @@ private fun GateHome(
     onLan: () -> Unit,
     onAccount: (AccountMeta) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .edgeInsets()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    EntryScaffold(
+        footer = {
+            if (!notice.isNullOrBlank()) {
+                ErrorBanner(message = notice)
+            }
+            PillButton(text = "Acesso remoto", onClick = onRemote)
+            PillButton(text = "Parear na rede local", onClick = onLan, primary = false)
+        },
     ) {
-        Spacer(Modifier.height(12.dp))
-        StatusPill(text = "E2E · Relay & LAN", color = BrandGold)
-        Spacer(Modifier.height(20.dp))
-        OnboardingHero(
-            title = "HiveMind",
-            subtitle = "Comande sua equipe de agentes pela rede local ou por um relay próprio.",
+        GoldMark()
+        Text(
+            "HiveMind",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Comande a equipe de agentes pelo celular.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextDim,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(28.dp))
-
-        if (!notice.isNullOrBlank()) {
-            ErrorBanner(message = notice)
-            Spacer(Modifier.height(16.dp))
-        }
-
-        HiveCard(contentPadding = PaddingValues(18.dp)) {
-            Button(
-                onClick = onRemote,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                Text("Acesso remoto", fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = onLan,
-                border = BorderStroke(1.dp, ObsidianBorder),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-            ) {
-                Text("Parear na rede local")
-            }
-        }
-
+        EntryBullet(
+            icon = Icons.Outlined.Groups,
+            title = "Projetos e conversas",
+            body = "A mesma equipe da IDE, com prévia e não lidas.",
+        )
+        EntryBullet(
+            icon = Icons.Outlined.QrCodeScanner,
+            title = "Pareia por QR",
+            body = "Rede local, Tailscale ou um relay seu.",
+        )
+        EntryBullet(
+            icon = Icons.Outlined.Shield,
+            title = "Canal cifrado",
+            body = "Sessão local ou caixa E2E até a IDE.",
+        )
         if (accounts.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
                 "CONTAS SALVAS",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextDim,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
             )
             Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                accounts.forEach { account ->
-                    HiveCard(
-                        onClick = { onAccount(account) },
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            accounts.forEach { account ->
+                Surface(
+                    onClick = { onAccount(account) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = ObsidianCard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    account.email,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    hostOf(account.relayUrl),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextDim,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Text("›", style = MaterialTheme.typography.titleMedium, color = BrandGold)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                account.email,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                hostOf(account.relayUrl),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDim,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = TextDim,
+                        )
                     }
                 }
             }
@@ -326,6 +282,8 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
     var relayUrl by remember(draft?.id) { mutableStateOf(draft?.relayUrl ?: "https://") }
     var email by remember(draft?.id) { mutableStateOf(draft?.email ?: "") }
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+    var emailOpen by remember(draft?.id) { mutableStateOf(!draft?.email.isNullOrBlank()) }
     var busy by remember { mutableStateOf(false) }
     var scanningQr by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -368,132 +326,133 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .edgeInsets()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                )
+    RelayEntry(
+        relayUrl = relayUrl,
+        email = email,
+        password = password,
+        showPassword = showPassword,
+        emailOpen = emailOpen,
+        busy = busy,
+        error = error ?: lastError,
+        onRelayUrl = { relayUrl = it },
+        onEmail = { email = it },
+        onPassword = { password = it },
+        onTogglePassword = { showPassword = !showPassword },
+        onToggleEmail = { emailOpen = !emailOpen },
+        onScan = { scanningQr = true },
+        onSubmit = { submit() },
+        onBack = onBack,
+    )
+}
+
+@Composable
+private fun RelayEntry(
+    relayUrl: String,
+    email: String,
+    password: String,
+    showPassword: Boolean,
+    emailOpen: Boolean,
+    busy: Boolean,
+    error: String?,
+    onRelayUrl: (String) -> Unit,
+    onEmail: (String) -> Unit,
+    onPassword: (String) -> Unit,
+    onTogglePassword: () -> Unit,
+    onToggleEmail: () -> Unit,
+    onScan: () -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit,
+) {
+    EntryScaffold(
+        footer = {
+            if (!error.isNullOrBlank()) {
+                ErrorBanner(message = error)
             }
+            if (emailOpen) {
+                PillButton(text = "Entrar", onClick = onSubmit, enabled = !busy, busy = busy)
+                QuietLink(text = "Escanear QR da IDE", onClick = onScan, enabled = !busy)
+            } else {
+                PillButton(text = "Escanear QR da IDE", onClick = onScan, enabled = !busy, busy = busy)
+                QuietLink(text = "Entrar com e-mail", onClick = onToggleEmail, enabled = !busy)
+            }
+        },
+    ) {
+        EntryBackHeader(title = "Relay", onBack = onBack)
+        if (!emailOpen) {
+            QrHero()
             Text(
                 "Entrar no relay",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Na IDE, gere o QR de acesso remoto e aponte a câmera.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextDim,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(18.dp))
+            EntryStep(index = 1, title = "Abra a IDE", body = "No computador, com o HiveMind aberto.")
+            EntryStep(index = 2, title = "Acesso remoto", body = "Gere o QR para entrar no celular.")
+            EntryStep(index = 3, title = "Aponte a câmera", body = "O app entra na conta sem digitar senha.")
+        } else {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "Entrar com e-mail",
+                style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
             )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "Use a conta do servidor de relay. Dá para entrar com o QR da IDE ou com e-mail e senha.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextDim,
-        )
-        Spacer(Modifier.height(16.dp))
-
-        Button(
-            onClick = { scanningQr = true },
-            enabled = !busy,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-        ) {
-            Text("Entrar com QR Code da IDE", fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(14.dp))
-
-        HiveCard(contentPadding = PaddingValues(16.dp)) {
-            val fieldColors = dev.hivemind.mobile.ui.hiveFieldColors()
-            OutlinedTextField(
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Use a conta criada no servidor do relay.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextDim,
+            )
+            Spacer(Modifier.height(22.dp))
+            IconField(
                 value = relayUrl,
-                onValueChange = { relayUrl = it },
-                label = { Text("URL do relay (https)") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onRelayUrl,
+                label = "URL do relay",
+                icon = Icons.Outlined.Link,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            IconField(
                 value = email,
-                onValueChange = { email = it },
-                label = { Text("E-mail ou usuário") },
-                placeholder = { Text("conta@example.com") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onEmail,
+                label = "E-mail ou usuário",
+                icon = Icons.Outlined.Email,
+                placeholder = "conta@example.com",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            IconField(
                 value = password,
-                onValueChange = { password = it },
-                label = { Text("Senha") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { submit() }),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onPassword,
+                label = "Senha",
+                icon = Icons.Outlined.Lock,
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                trailing = {
+                    IconButton(onClick = onTogglePassword, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (showPassword) "Ocultar senha" else "Mostrar senha",
+                        )
+                    }
+                },
             )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { submit() },
-                enabled = !busy,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text("Entrar", fontWeight = FontWeight.SemiBold)
-                }
-            }
+            HelpDisclosure(
+                "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
+            )
         }
-
-        val shown = error ?: lastError
-        if (!shown.isNullOrBlank()) {
-            Spacer(Modifier.height(12.dp))
-            ErrorBanner(message = shown)
-        }
-        Spacer(Modifier.height(8.dp))
-        dev.hivemind.mobile.ui.HelpDisclosure(
-            "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
-        )
     }
 }
 

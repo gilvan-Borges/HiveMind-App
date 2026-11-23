@@ -32,6 +32,11 @@ class OnboardingPaparazziTest {
     }
 
     @Test
+    fun depoisRelayEmail() {
+        paparazzi.snapshot(name = "depois-relay-email") { HiveMindTheme { RelayLoginEmailPreview() } }
+    }
+
+    @Test
     fun depoisPareamento() {
         paparazzi.snapshot(name = "depois-pareamento") { HiveMindTheme { LanPairingPreview() } }
     }

@@ -164,6 +164,7 @@ private fun hiveText(
 )
 
 private val HiveMindTypography = Typography(
+    displaySmall = hiveText(36.sp, 42.sp, FontWeight.Bold, (-0.8).sp),
     headlineMedium = hiveText(26.sp, 32.sp, FontWeight.Bold, (-0.4).sp),
     headlineSmall = hiveText(21.sp, 27.sp, FontWeight.Bold, (-0.2).sp),
     titleLarge = hiveText(20.sp, 26.sp, FontWeight.Bold, (-0.2).sp),
