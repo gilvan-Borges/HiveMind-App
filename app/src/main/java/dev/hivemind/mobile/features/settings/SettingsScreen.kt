@@ -284,6 +284,10 @@ fun SettingsBody(
             )
             Spacer(Modifier.height(12.dp))
         }
+        if (routines.isEmpty()) {
+            SettingsGroup(listOf(SettingsRow("Rotinas do Agent Hive", "Nenhuma rotina publicada pela IDE.")))
+            Spacer(Modifier.height(12.dp))
+        }
         if (routines.isNotEmpty()) {
             Surface(
                 shape = RoundedCornerShape(18.dp),

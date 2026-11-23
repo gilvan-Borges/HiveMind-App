@@ -49,7 +49,7 @@ class HubState(private val json: Json) {
     val autoreview = MutableStateFlow<Map<String, AutoReviewStatus>>(emptyMap())
     val providerHealth = MutableStateFlow<List<ProviderHealthView>>(emptyList())
     val relayGap = MutableStateFlow<RelayGapNotice?>(null)
-    val activity = MutableStateFlow<ActivityNotice?>(null)
+    val activities = MutableStateFlow<List<ActivityNotice>>(emptyList())
 
     val selectedWorkspace = MutableStateFlow<String?>(null)
     val selectedLaneId = MutableStateFlow<String?>(null)
@@ -364,7 +364,7 @@ class HubState(private val json: Json) {
             "activity" -> {
                 val data = ev.data ?: return
                 runCatching { json.decodeFromString<ActivityNotice>(data.toString()) }
-                    .onSuccess { activity.value = it }
+                    .onSuccess { activities.value = rememberActivities(activities.value, it) }
             }
             "relay_gap" -> {
                 val data = ev.data ?: return
@@ -393,6 +393,13 @@ class HubState(private val json: Json) {
     private fun refreshPending() {
         _pendingApprovals.value = lanes.value.values.flatMap { it.pendingApprovals }
     }
+}
+
+/** Mantém a última atividade de cada autor na lane, no máximo [cap] cartões. */
+fun rememberActivities(current: List<ActivityNotice>, next: ActivityNotice, cap: Int = 6): List<ActivityNotice> {
+    if (next.laneId.isBlank() && next.sessionId.isBlank()) return current
+    val kept = current.filterNot { it.laneId == next.laneId && it.author == next.author && it.phase == next.phase }
+    return (kept + next).takeLast(cap.coerceAtLeast(1))
 }
 
 @Serializable

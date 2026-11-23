@@ -94,6 +94,7 @@ fun DiffsScreen(
     var prTitle by remember { mutableStateOf("") }
     var prBody by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
     suspend fun load() {
         loading = true
@@ -143,8 +144,8 @@ fun DiffsScreen(
                             )
                         }
                     }
-                    TextButton(onClick = { commitOpen = true }, enabled = files.isNotEmpty() && !busy) { Text("Commit") }
-                    TextButton(onClick = { prOpen = true }, enabled = !busy) { Text("PR") }
+                    TextButton(onClick = { commitOpen = true }, enabled = files.isNotEmpty() && !busy) { Text("Aprovar commit") }
+                    TextButton(onClick = { prOpen = true }, enabled = !busy) { Text("Aprovar PR") }
                     IconButton(
                         onClick = { container.appScope.launch { load() } },
                         modifier = Modifier.size(48.dp),
@@ -154,6 +155,14 @@ fun DiffsScreen(
                 }
                 HorizontalDivider(color = ObsidianBorder)
             }
+        }
+        if (!notice.isNullOrBlank()) {
+            Text(
+                notice.orEmpty(),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = SuccessGreen,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         when {
             loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -240,6 +249,7 @@ fun DiffsScreen(
                                     .onSuccess {
                                         commitMessage = ""
                                         commitOpen = false
+                                        notice = "Commit registrado."
                                         load()
                                     }
                                     .onFailure { error = it.message }
@@ -268,11 +278,11 @@ fun DiffsScreen(
                             busy = true
                             container.appScope.launch {
                                 runCatching { container.api.openPullRequest(workspace, prTitle.trim(), prBody.trim(), "main") }
-                                    .onSuccess {
+                                    .onSuccess { response ->
                                         prTitle = ""
                                         prBody = ""
                                         prOpen = false
-                                        error = it.url.takeIf { url -> url.isNotBlank() }?.let { url -> "PR aberto: $url" }
+                                        notice = response.url.ifBlank { "Pull request aberto." }
                                     }
                                     .onFailure { error = it.message }
                                 busy = false

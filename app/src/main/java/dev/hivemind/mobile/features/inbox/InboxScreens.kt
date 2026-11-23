@@ -84,6 +84,7 @@ fun ProjectsInboxScreen(
     val collapsed by viewModel.collapsed.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val status by viewModel.statusLabel.collectAsState()
     val page = remember(projects, conversations, query, collapsed) { viewModel.projectPage() }
     var picker by remember { mutableStateOf(false) }
     var kindFor by remember { mutableStateOf<String?>(null) }
@@ -105,6 +106,7 @@ fun ProjectsInboxScreen(
         },
         onRefresh = viewModel::refresh,
         profileInitial = initial,
+        statusLabel = status,
         back = null,
     ) {
         InboxBody(
@@ -207,6 +209,7 @@ fun ConversationsInboxScreen(
     val collapsed by viewModel.collapsed.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val status by viewModel.statusLabel.collectAsState()
     val page = remember(conversations, query, collapsed, workspace) {
         viewModel.conversationPage(workspace)
     }
@@ -223,6 +226,7 @@ fun ConversationsInboxScreen(
         onCreate = { chooseKind = true },
         onRefresh = viewModel::refresh,
         profileInitial = profileInitial,
+        statusLabel = status,
         back = onBack,
     ) {
         InboxBody(
@@ -298,6 +302,7 @@ private fun InboxScaffold(
     onCreate: () -> Unit,
     onRefresh: () -> Unit,
     profileInitial: String,
+    statusLabel: String,
     back: (() -> Unit)?,
     content: @Composable () -> Unit,
 ) {
@@ -334,6 +339,15 @@ private fun InboxScaffold(
                 onClick = onCreate,
                 tint = TextPrimary,
             )
+        }
+        if (statusLabel.isNotBlank()) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                dev.hivemind.mobile.ui.StatusPill(
+                    text = statusLabel,
+                    color = if (statusLabel.startsWith("IDE online")) SuccessGreen else TextDim,
+                    showDot = true,
+                )
+            }
         }
         Box(
             modifier = Modifier
@@ -625,6 +639,7 @@ fun ProjectsInboxPreview() {
         onCreate = {},
         onRefresh = {},
         profileInitial = "A",
+        statusLabel = "IDE online · LAN · acme",
         back = null,
     ) {
         PreviewSections(sampleProjectSections())
@@ -643,6 +658,7 @@ fun ConversationsInboxPreview() {
         onCreate = {},
         onRefresh = {},
         profileInitial = "A",
+        statusLabel = "IDE online · Relay · org-alpha",
         back = {},
     ) {
         PreviewSections(sampleConversationSections())
@@ -725,6 +741,9 @@ class ContainerInboxSource(private val container: AppContainer) : InboxSource {
         val items = container.api.approvals(workspace)
         container.hubState.mergeApprovals(workspace, items)
     }
+
+    override suspend fun health(): dev.hivemind.mobile.core.models.Health? =
+        runCatching { container.api.health() }.getOrNull()
 
     override fun cachedProjects(): List<ProjectSummary> = container.hubState.projects.value
 

@@ -53,6 +53,27 @@ class LocalNotifier(private val context: Context) {
         )
     }
 
+    fun cancelApproval(approvalId: String) {
+        if (approvalId.isBlank()) return
+        NotificationManagerCompat.from(context).cancel("approval", approvalId.hashCode())
+    }
+
+    private fun decisionIntent(approved: Boolean, info: ApprovalInfo): PendingIntent {
+        val action = if (approved) ApprovalActions.APPROVE else ApprovalActions.DENY
+        val intent = Intent(context, ApprovalActionReceiver::class.java).apply {
+            this.action = action
+            putExtra(ApprovalActions.EXTRA_ID, info.approvalId)
+            putExtra(ApprovalActions.EXTRA_WORKSPACE, info.workspace)
+        }
+        val request = info.approvalId.hashCode() xor if (approved) 0x4100 else 0x4E00
+        return PendingIntent.getBroadcast(
+            context,
+            request,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     fun notifyApproval(info: ApprovalInfo) {
         if (!canPost()) return
         val text = if (info.prompt.length > 120) info.prompt.take(120) + "…" else info.prompt
@@ -62,8 +83,11 @@ class LocalNotifier(private val context: Context) {
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(info.prompt))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(contentIntent())
+            .addAction(0, "Aprovar", decisionIntent(true, info))
+            .addAction(0, "Negar", decisionIntent(false, info))
             .build()
         // canPost() acima já verificou POST_NOTIFICATIONS (API 33+); em APIs
         // anteriores a permissão runtime não existe e o notify é permitido.

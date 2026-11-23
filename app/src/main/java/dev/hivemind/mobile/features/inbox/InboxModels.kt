@@ -1,5 +1,6 @@
 package dev.hivemind.mobile.features.inbox
 
+import dev.hivemind.mobile.core.models.Health
 import dev.hivemind.mobile.core.models.LaneSnapshot
 import dev.hivemind.mobile.core.models.ProjectSummary
 import dev.hivemind.mobile.core.models.SessionSummary
@@ -54,6 +55,7 @@ interface InboxSource {
     suspend fun sessions(workspace: String): WorkspaceSessionsSummary
     suspend fun markRead(workspace: String, sessionId: String)
     suspend fun refreshApprovals(workspace: String)
+    suspend fun health(): Health? = null
     fun cachedProjects(): List<ProjectSummary> = emptyList()
     fun cachedLanes(): List<LaneSnapshot> = emptyList()
 }
@@ -66,6 +68,17 @@ object InboxIndex {
     const val UNSECTIONED = "Sem seção"
     const val SECTION_EQUIPE = "Equipe"
     const val SECTION_HIVE = "Agent Hive"
+
+    fun ideStatusLabel(online: Boolean, transport: String, project: String): String {
+        val route = when (transport.trim().lowercase()) {
+            "lan" -> "LAN"
+            "tailscale" -> "Tailscale"
+            "relay" -> "Relay"
+            else -> ""
+        }
+        val head = if (online) "IDE online" else "IDE offline"
+        return listOf(head, route, project.trim()).filter { it.isNotBlank() }.joinToString(" · ")
+    }
 
     fun avatarSlot(seed: String): Int =
         (seed.hashCode() and Int.MAX_VALUE) % 4
@@ -251,6 +264,7 @@ class InboxViewModel(
     val collapsed: StateFlow<Set<String>> = _collapsed.asStateFlow()
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
     val error: StateFlow<String?> = _error.asStateFlow()
+    val statusLabel = MutableStateFlow("IDE offline")
 
     fun refresh() {
         scope.launch { reload() }
@@ -275,6 +289,14 @@ class InboxViewModel(
                 runCatching { source.refreshApprovals(ws) }
             }
             _conversations.value = built
+            val health = runCatching { source.health() }.getOrNull()
+            val open = health?.openProject
+            val projectName = open?.name?.ifBlank { null } ?: open?.workspace?.let { InboxIndex.leaf(it) }.orEmpty()
+            statusLabel.value = InboxIndex.ideStatusLabel(
+                online = health?.online == true || health?.ok == true,
+                transport = health?.transport.orEmpty(),
+                project = projectName,
+            )
             _error.value = null
         } catch (e: Exception) {
             _error.value = e.message?.ifBlank { null } ?: "Não foi possível carregar os projetos."
