@@ -10,6 +10,7 @@ import dev.hivemind.mobile.features.chat.ChatThreadPreview
 import dev.hivemind.mobile.features.diffs.CommitDialogPreview
 import dev.hivemind.mobile.features.diffs.DiffFilePreview
 import dev.hivemind.mobile.features.diffs.DiffsEmptyPreview
+import dev.hivemind.mobile.features.diffs.DiffsErrorPreview
 import dev.hivemind.mobile.features.diffs.DiffsPreview
 import dev.hivemind.mobile.features.diffs.PrDialogPreview
 import dev.hivemind.mobile.features.flow.FlowEmptyPreview
@@ -33,6 +34,7 @@ import dev.hivemind.mobile.features.projects.ManageProjectsEmptyPreview
 import dev.hivemind.mobile.features.projects.ManageProjectsPreview
 import dev.hivemind.mobile.features.projects.UnpairDialogPreview
 import dev.hivemind.mobile.features.relay.DevicesEmptyPreview
+import dev.hivemind.mobile.features.relay.DevicesErrorPreview
 import dev.hivemind.mobile.features.relay.DevicesPreview
 import dev.hivemind.mobile.features.relay.GateAccountsPreview
 import dev.hivemind.mobile.features.relay.GateHomePreview
@@ -81,6 +83,7 @@ class AppGalleryPaparazziTest {
         snap("tela-diffs") { DiffsPreview() }
         snap("tela-diff-arquivo") { DiffFilePreview() }
         snap("tela-diffs-vazio") { DiffsEmptyPreview() }
+        snap("tela-diffs-erro") { DiffsErrorPreview() }
         snap("tela-commit") { CommitDialogPreview() }
         snap("tela-pr") { PrDialogPreview() }
         snap("tela-fluxo") { FlowTasksPreview() }
@@ -89,6 +92,7 @@ class AppGalleryPaparazziTest {
         snap("tela-fluxo-prs") { FlowPrsPreview() }
         snap("tela-ides") { DevicesPreview() }
         snap("tela-ides-vazio") { DevicesEmptyPreview() }
+        snap("tela-ides-erro") { DevicesErrorPreview() }
         snap("tela-vincular") { LinkIdePreview() }
         snap("tela-gerenciar") { ManageProjectsPreview() }
         snap("tela-gerenciar-vazio") { ManageProjectsEmptyPreview() }

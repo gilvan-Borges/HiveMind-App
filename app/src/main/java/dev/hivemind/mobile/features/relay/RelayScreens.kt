@@ -27,6 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.DesktopWindows
+import androidx.compose.material.icons.outlined.Laptop
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Link
@@ -503,123 +507,27 @@ private fun DeviceList(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().edgeInsets()) {
-        Surface(color = ObsidianCard) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Suas IDEs",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" · "),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextDim,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (conn is ConnState.Connecting || conn is ConnState.Reconnecting) {
-                        StatusPill(
-                            text = if (conn is ConnState.Reconnecting) "Reconectando…" else "Conectando…",
-                            color = ApprovalAmber,
-                            showDot = true,
-                        )
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                ) {
-                    Button(
-                        onClick = onLink,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandGold,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                    ) {
-                        Text("Vincular IDE", fontWeight = FontWeight.SemiBold)
-                    }
-                    OutlinedButton(
-                        onClick = { showAccounts = true },
-                        border = BorderStroke(1.dp, ObsidianBorder),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text("Contas")
-                    }
-                }
-                HorizontalDivider(color = ObsidianBorder)
+    IdeGallery(
+        subtitle = listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" · "),
+        route = "Relay",
+        devices = devices,
+        error = localError ?: error,
+        busyId = busyId,
+        connecting = conn is ConnState.Connecting || conn is ConnState.Reconnecting,
+        onOpen = { device ->
+            busyId = device.id
+            localError = null
+            container.appScope.launch {
+                runCatching { container.relay.connect(device.id) }
+                    .onFailure { localError = it.message }
+                busyId = null
             }
-        }
-
-        val shown = localError ?: error
-        if (!shown.isNullOrBlank()) {
-            ErrorBanner(
-                message = shown,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-
-        if (devices.isEmpty()) {
-            EmptyStatePanel(
-                title = "Nenhuma IDE vinculada",
-                subtitle = "Gere um código na IDE (Acesso remoto) ou escaneie o QR para começar.",
-                actionLabel = "Vincular primeira IDE",
-                onAction = onLink,
-                secondaryLabel = "Pareamento na rede local",
-                onSecondary = onLan,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                items(devices, key = { it.id }) { device ->
-                    DeviceRow(
-                        device = device,
-                        busy = busyId == device.id,
-                        onOpen = {
-                            busyId = device.id
-                            localError = null
-                            container.appScope.launch {
-                                runCatching { container.relay.connect(device.id) }
-                                    .onFailure { localError = it.message }
-                                busyId = null
-                            }
-                        },
-                        onRevoke = { revoke = device },
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                TextButton(onClick = onLan, modifier = Modifier.heightIn(min = 44.dp)) {
-                    Text("Pareamento na rede local", color = TextDim)
-                }
-            }
-        }
-    }
+        },
+        onRevoke = { revoke = it },
+        onLink = onLink,
+        onAccounts = { showAccounts = true },
+        onLan = onLan,
+    )
 
     if (revoke != null) {
         val target = revoke!!
@@ -714,83 +622,141 @@ private fun DeviceList(
 @Composable
 private fun DeviceRow(
     device: DeviceInfo,
+    route: String,
     busy: Boolean,
     onOpen: () -> Unit,
     onRevoke: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-
-    HiveCard(
-        highlighted = device.online,
-        accentColor = SuccessGreen,
-        onClick = { if (!busy) onOpen() },
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+    val laptop = device.name.contains("note", ignoreCase = true) || device.name.contains("book", ignoreCase = true)
+    HiveCard(highlighted = device.online, accentColor = if (device.online) SuccessGreen else ObsidianBorder) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .background(if (device.online) SuccessGreen else TextDim, CircleShape),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                device.name.ifBlank { device.id },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            StatusPill(
-                text = if (device.online) "online" else "offline",
-                color = if (device.online) SuccessGreen else TextDim,
-            )
+                Modifier
+                    .size(64.dp)
+                    .background(ObsidianSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (laptop) Icons.Outlined.Laptop else Icons.Outlined.DesktopWindows,
+                    contentDescription = null,
+                    tint = BrandGold,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    device.name.ifBlank { "IDE" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (device.online) {
+                        dev.hivemind.mobile.ui.PulseDot(SuccessGreen)
+                    } else {
+                        Box(Modifier.size(8.dp).background(TextDim, CircleShape))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (device.online) "online" else "offline", color = if (device.online) SuccessGreen else TextDim)
+                }
+            }
             Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "Ações", tint = TextDim)
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Revogar vínculo", color = ErrorRed) },
-                        onClick = {
-                            menuOpen = false
-                            onRevoke()
-                        },
+                        onClick = { menuOpen = false; onRevoke() },
                     )
                 }
             }
         }
-        if (!device.e2eReady) {
-            Spacer(Modifier.height(6.dp))
-            StatusPill(text = "Criptografia ainda incompleta", color = ApprovalAmber)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill(text = route, color = BrandGold)
+            StatusPill(
+                text = if (device.e2eReady) "E2E pronto" else "E2E incompleto",
+                color = if (device.e2eReady) SuccessGreen else ApprovalAmber,
+            )
         }
         Spacer(Modifier.height(12.dp))
-        Button(
+        dev.hivemind.mobile.ui.PillButton(
+            text = "Controlar",
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onOpen()
             },
             enabled = !busy,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp),
-        ) {
-            if (busy) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+            busy = busy,
+        )
+    }
+}
+
+@Composable
+private fun IdeGallery(
+    subtitle: String,
+    route: String,
+    devices: List<DeviceInfo>,
+    error: String?,
+    busyId: String?,
+    connecting: Boolean,
+    onOpen: (DeviceInfo) -> Unit,
+    onRevoke: (DeviceInfo) -> Unit,
+    onLink: () -> Unit,
+    onAccounts: () -> Unit,
+    onLan: () -> Unit,
+) {
+    dev.hivemind.mobile.ui.EntryScaffold(
+        footer = {
+            if (connecting) {
+                StatusPill(text = "Conectando…", color = ApprovalAmber, showDot = true)
+            }
+            dev.hivemind.mobile.ui.PillButton("Vincular IDE", onLink)
+            dev.hivemind.mobile.ui.QuietLink("Contas", onAccounts)
+            dev.hivemind.mobile.ui.QuietLink("Parear na rede local", onLan)
+        },
+    ) {
+        Text(
+            "Suas IDEs",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, color = TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(16.dp))
+        if (!error.isNullOrBlank()) {
+            ErrorBanner(message = error)
+            Spacer(Modifier.height(12.dp))
+        }
+        if (devices.isEmpty() && error.isNullOrBlank()) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.Computer,
+                title = "Nenhuma IDE vinculada",
+                body = "Gere um código na IDE, em Acesso remoto, ou escaneie o QR.",
+            )
+        } else if (devices.isEmpty()) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.CloudOff,
+                title = "Não deu para listar as IDEs",
+                body = error.orEmpty(),
+            )
+        } else {
+            devices.forEach { device ->
+                DeviceRow(
+                    device = device,
+                    route = route,
+                    busy = busyId == device.id,
+                    onOpen = { onOpen(device) },
+                    onRevoke = { onRevoke(device) },
                 )
-            } else {
-                Text("Controlar IDE", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
@@ -1126,43 +1092,60 @@ fun RelayErrorPreview() {
 
 @Composable
 fun DevicesPreview() {
-    Column(Modifier.fillMaxSize().edgeInsets()) {
-        Surface(color = ObsidianCard, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Suas IDEs", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("conta@example.com · relay.example.com", color = TextDim, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            DeviceRow(
-                device = dev.hivemind.mobile.core.relay.DeviceInfo(id = "ide-1", name = "pc-lab", online = true, e2eReady = true),
-                busy = false,
-                onOpen = {},
-                onRevoke = {},
-            )
-            DeviceRow(
-                device = dev.hivemind.mobile.core.relay.DeviceInfo(id = "ide-2", name = "notebook", online = false, e2eReady = false),
-                busy = false,
-                onOpen = {},
-                onRevoke = {},
-            )
-        }
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com · relay.example.com",
+            route = "Relay",
+            devices = listOf(
+                DeviceInfo(id = "ide-1", name = "pc-lab", online = true, e2eReady = true),
+                DeviceInfo(id = "ide-2", name = "notebook", online = false, e2eReady = false),
+            ),
+            error = null,
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
+        )
     }
 }
 
 @Composable
 fun DevicesEmptyPreview() {
-    Column(Modifier.fillMaxSize().edgeInsets()) {
-        Surface(color = ObsidianCard, modifier = Modifier.fillMaxWidth()) {
-            Text("Suas IDEs", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        }
-        EmptyStatePanel(
-            title = "Nenhuma IDE vinculada",
-            subtitle = "Gere um código na IDE (Acesso remoto) ou escaneie o QR para começar.",
-            actionLabel = "Vincular primeira IDE",
-            onAction = {},
-            secondaryLabel = "Pareamento na rede local",
-            onSecondary = {},
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com",
+            route = "Relay",
+            devices = emptyList(),
+            error = null,
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
+        )
+    }
+}
+
+@Composable
+fun DevicesErrorPreview() {
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com",
+            route = "Relay",
+            devices = emptyList(),
+            error = "O relay não respondeu. Tente de novo em instantes.",
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
         )
     }
 }

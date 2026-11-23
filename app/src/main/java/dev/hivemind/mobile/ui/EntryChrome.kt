@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,9 +69,11 @@ import dev.hivemind.mobile.theme.BorderControl
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.BrandGoldBorder
 import dev.hivemind.mobile.theme.BrandGoldSubtle
+import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBg
 import dev.hivemind.mobile.theme.ObsidianCard
 import dev.hivemind.mobile.theme.ObsidianSurface
+import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.theme.TextPrimary
 import kotlinx.coroutines.isActive
@@ -85,6 +88,7 @@ fun StaticEntry(content: @Composable () -> Unit) {
 
 @Composable
 fun EntryScaffold(
+    applyInsets: Boolean = true,
     footer: @Composable ColumnScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -104,7 +108,7 @@ fun EntryScaffold(
         Column(
             Modifier
                 .fillMaxSize()
-                .edgeInsets()
+                .then(if (applyInsets) Modifier.edgeInsets() else Modifier)
                 .padding(horizontal = 22.dp),
         ) {
             Column(
@@ -409,4 +413,108 @@ fun IconField(
         keyboardActions = keyboardActions,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+@Composable
+fun PulseDot(color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    val motion = LocalEntryMotion.current
+    LaunchedEffect(motion) {
+        if (!motion) return@LaunchedEffect
+        while (isActive) {
+            animate(1f, 1.45f, animationSpec = tween(800, easing = FastOutSlowInEasing)) { value, _ ->
+                scale = value
+            }
+            animate(1.45f, 1f, animationSpec = tween(800, easing = FastOutSlowInEasing)) { value, _ ->
+                scale = value
+            }
+        }
+    }
+    Box(modifier.size(16.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(16.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 0.35f
+                }
+                .background(color, CircleShape),
+        )
+        Box(Modifier.size(8.dp).background(color, CircleShape))
+    }
+}
+
+@Composable
+fun ChangeBar(added: Int, removed: Int, modifier: Modifier = Modifier) {
+    val add = added.coerceAtLeast(0)
+    val cut = removed.coerceAtLeast(0)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(99.dp))
+            .background(ObsidianSurface),
+    ) {
+        if (add == 0 && cut == 0) {
+            Box(Modifier.fillMaxSize().background(ObsidianSurface))
+        } else {
+            if (add > 0) {
+                Box(Modifier.weight(add.toFloat()).fillMaxHeight().background(SuccessGreen))
+            }
+            if (cut > 0) {
+                Box(Modifier.weight(cut.toFloat()).fillMaxHeight().background(ErrorRed))
+            }
+        }
+    }
+}
+
+@Composable
+fun StudioEmpty(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(top = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(120.dp)
+                    .background(
+                        Brush.radialGradient(
+                            0f to BrandGold.copy(alpha = 0.45f),
+                            1f to ObsidianBg.copy(alpha = 0f),
+                        ),
+                        CircleShape,
+                    ),
+            )
+            Box(
+                Modifier
+                    .size(72.dp)
+                    .background(ObsidianSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = BrandGold, modifier = Modifier.size(32.dp))
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextDim,
+            textAlign = TextAlign.Center,
+        )
+    }
 }

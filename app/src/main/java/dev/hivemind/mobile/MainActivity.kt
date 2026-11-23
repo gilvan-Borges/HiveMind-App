@@ -295,11 +295,12 @@ fun MainScaffold(container: AppContainer) {
                 onOpenFlow = { push(Dest.Flow) },
                 onOpenDiffs = { push(Dest.Diffs) },
             )
-            Dest.Flow -> ToolHost(padding, "Fluxo", ::pop) { inner ->
+            Dest.Flow -> ToolHost(padding, "Fluxo", ::pop, chrome = false) { inner ->
                 FlowScreen(
                     container = container,
                     padding = inner,
                     workspace = container.hubState.selectedWorkspace.collectAsState().value,
+                    onBack = ::pop,
                     onOpenChat = open@{ prompt, mode ->
                         val ws = container.hubState.selectedWorkspace.value ?: return@open
                         val lane = container.hubState.ideLane(ws)
@@ -318,11 +319,12 @@ fun MainScaffold(container: AppContainer) {
                     },
                 )
             }
-            Dest.Diffs -> ToolHost(padding, "Diffs", ::pop) { inner ->
+            Dest.Diffs -> ToolHost(padding, "Diffs", ::pop, chrome = false) { inner ->
                 DiffsScreen(
                     container = container,
                     padding = inner,
                     workspace = container.hubState.selectedWorkspace.collectAsState().value,
+                    onBack = ::pop,
                     onAskInChat = ask@{ prompt ->
                         val ws = container.hubState.selectedWorkspace.value ?: return@ask
                         push(
@@ -386,14 +388,17 @@ private fun ToolHost(
     padding: PaddingValues,
     title: String,
     onBack: () -> Unit,
+    chrome: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = MaterialTheme.colorScheme.onSurface)
+        if (chrome) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             content(PaddingValues(0.dp))

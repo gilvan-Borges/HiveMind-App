@@ -55,6 +55,7 @@ import com.google.mlkit.vision.common.InputImage
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.api.PairQr
 import dev.hivemind.mobile.core.lan.LanMessages
+import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.theme.TextPrimary
 import dev.hivemind.mobile.ui.EntryBackHeader
 import dev.hivemind.mobile.ui.EntryScaffold
@@ -127,12 +128,35 @@ fun QrScannerPreview() {
 
 @Composable
 fun QrPermissionPreview() {
-    Box(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
-        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Permissão de câmera necessária para escanear o QR.", color = TextPrimary)
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = {}) { Text("Permitir câmera") }
-        }
+    CameraPermissionPane(onAllow = {}, onClose = {})
+}
+
+@Composable
+fun CameraPermissionPane(onAllow: () -> Unit, onClose: () -> Unit) {
+    dev.hivemind.mobile.ui.EntryScaffold(
+        footer = {
+            dev.hivemind.mobile.ui.PillButton("Permitir câmera", onAllow)
+            dev.hivemind.mobile.ui.QuietLink("Agora não", onClose)
+        },
+    ) {
+        dev.hivemind.mobile.ui.EntryBackHeader("Câmera", onClose)
+        dev.hivemind.mobile.ui.QrHero()
+        Text(
+            "A câmera lê o QR",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Sem ela o app não enxerga o código que a IDE mostra. A imagem não sai do celular.",
+            color = TextDim,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -311,20 +335,16 @@ fun QrScannerOverlay(
         )
     }
 
+    if (!hasCamera) {
+        CameraPermissionPane(
+            onAllow = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onClose = onClose,
+        )
+        return
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
-        if (!hasCamera) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("Permissão de câmera necessária para escanear o QR.", color = TextPrimary)
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Permitir câmera")
-                }
-            }
-        } else {
-            AndroidView(
+        AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
                     val future = ProcessCameraProvider.getInstance(ctx)
@@ -369,7 +389,6 @@ fun QrScannerOverlay(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-        }
 
         Row(
             modifier = Modifier
