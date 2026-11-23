@@ -23,6 +23,7 @@ data class ProjectSummary(
     val branch: String = "",
     val stack: String = "",
     val activeTeam: String = "",
+    val composerMode: String = "",
     val runningLanes: Int = 0,
     val pendingApprovals: Int = 0,
 )

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -115,6 +116,7 @@ import dev.hivemind.mobile.theme.ActionPrimaryText
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.BrandGoldBorder
+import dev.hivemind.mobile.theme.BrandGoldStrong
 import dev.hivemind.mobile.theme.BrandGoldSubtle
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
@@ -253,7 +255,9 @@ fun ChatScreen(
     container: AppContainer,
     padding: PaddingValues,
     draftSeed: String? = null,
+    draftMode: String? = null,
     onConsumeDraftSeed: () -> Unit = {},
+    onConsumeDraftMode: () -> Unit = {},
     onOpenDrawer: () -> Unit = {},
     onOpenFlow: () -> Unit = {},
     onOpenDiffs: () -> Unit = {},
@@ -281,6 +285,7 @@ fun ChatScreen(
     var sessionDetail by remember { mutableStateOf<SessionDetail?>(null) }
     var continueSessionId by remember { mutableStateOf<String?>(null) }
     var quickSeed by remember { mutableStateOf<String?>(null) }
+    var quickMode by remember { mutableStateOf<String?>(null) }
     // Covers the gap between POST /runs/start Accepted and SSE running=true.
     var runPending by remember { mutableStateOf(false) }
 
@@ -291,10 +296,12 @@ fun ChatScreen(
         container.refreshLanes(ws)
     }
 
-    LaunchedEffect(draftSeed) {
+    LaunchedEffect(draftSeed, draftMode) {
         if (!draftSeed.isNullOrBlank()) {
             quickSeed = draftSeed
+            if (!draftMode.isNullOrBlank()) quickMode = draftMode
             onConsumeDraftSeed()
+            onConsumeDraftMode()
         }
     }
 
@@ -435,7 +442,9 @@ fun ChatScreen(
             continueSessionId = continueSessionId,
             onClearContinueSession = { continueSessionId = null },
             seedText = quickSeed,
+            seedMode = quickMode,
             onConsumeSeed = { quickSeed = null },
+            onConsumeMode = { quickMode = null },
             onRunPendingChange = { runPending = it },
         )
     }
@@ -716,7 +725,7 @@ private fun ChatLog(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     items(displayItems) { item -> DisplayItemRow(item) }
                 }
@@ -822,49 +831,63 @@ private fun DisplayItemRow(item: ChatDisplayItem) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    Surface(
-                        color = ObsidianSurface,
-                        shape = RoundedCornerShape(18.dp),
-                        border = BorderStroke(1.dp, ObsidianBorder),
-                        modifier = Modifier.fillMaxWidth(0.84f),
+                    Column(
+                        modifier = Modifier.widthIn(max = 320.dp),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            item.text,
-                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
-                            color = TextPrimary,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            "Você",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextDim,
                         )
+                        Surface(
+                            color = ObsidianSurface,
+                            shape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp),
+                            border = BorderStroke(1.dp, BrandGoldBorder),
+                        ) {
+                            Text(
+                                item.text,
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                                color = TextPrimary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            )
+                        }
                     }
                 }
             } else {
-                // Resposta do assistente fluida diretamente no fundo (estilo Claude Code)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                Surface(
+                    color = ObsidianCard,
+                    shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
+                    border = BorderStroke(1.dp, ObsidianBorder),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(BrandGold, CircleShape),
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(BrandGold, CircleShape),
+                            )
+                            Text(
+                                item.authorLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = BrandGoldStrong,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                         Text(
-                            item.authorLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BrandGold,
-                            fontWeight = FontWeight.SemiBold,
+                            item.text,
+                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                            color = TextBody,
                         )
                     }
-                    Text(
-                        item.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                        color = TextBody,
-                    )
                 }
             }
         }
@@ -1158,7 +1181,9 @@ private fun Composer(
     continueSessionId: String?,
     onClearContinueSession: () -> Unit,
     seedText: String?,
+    seedMode: String?,
     onConsumeSeed: () -> Unit,
+    onConsumeMode: () -> Unit,
     onRunPendingChange: (Boolean) -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
@@ -1203,9 +1228,14 @@ private fun Composer(
         }
     }
 
-    LaunchedEffect(seedText) {
+    LaunchedEffect(seedText, seedMode) {
+        val mode = seedMode
+        if (!mode.isNullOrBlank()) {
+            runMode = mode
+            onConsumeMode()
+        }
         if (!seedText.isNullOrBlank()) {
-            text = if (text.isBlank()) seedText else "$text\n$seedText"
+            text = if (text.isBlank() || !mode.isNullOrBlank()) seedText else "$text\n$seedText"
             onConsumeSeed()
         }
     }

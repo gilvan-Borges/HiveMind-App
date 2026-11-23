@@ -124,6 +124,25 @@ class HubState(private val json: Json) {
     fun lanesOf(workspace: String): List<LaneSnapshot> =
         lanes.value.values.filter { it.workspace == workspace }.sortedBy { it.laneId }
 
+    /** Lane da IDE neste workspace. Lanes criadas pelo app ficam de fora. */
+    fun ideLane(workspace: String): LaneSnapshot? {
+        if (workspace.isBlank()) return null
+        val skip = setOf("lane-mobile", "lane-autoreview", "resident")
+        val mine = lanes.value.values.filter { it.workspace == workspace && it.laneId !in skip }
+        if (mine.isEmpty()) return null
+        val team = projects.value.firstOrNull { it.workspace == workspace }?.activeTeam.orEmpty()
+        return mine.firstOrNull { team.isNotBlank() && it.teamName.equals(team, ignoreCase = true) }
+            ?: mine.firstOrNull { it.running }
+            ?: mine.first()
+    }
+
+    /** Modo do composer da IDE. Cai no modo da última execução da lane se o composer ainda não publicou. */
+    fun ideRunMode(workspace: String): String? {
+        val fromProject = projects.value.firstOrNull { it.workspace == workspace }?.composerMode?.trim().orEmpty()
+        if (fromProject.isNotBlank()) return fromProject
+        return ideLane(workspace)?.runMode?.trim()?.takeIf { it.isNotBlank() }
+    }
+
     /** SSE lane_event — mescla no snapshot vivo da lane. */
     fun onLaneEvent(ev: LaneEvent) {
         if (ev.laneId.isBlank()) return

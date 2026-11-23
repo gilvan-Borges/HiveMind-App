@@ -78,7 +78,7 @@ fun FlowScreen(
     container: AppContainer,
     padding: PaddingValues,
     workspace: String?,
-    onOpenChat: () -> Unit = {},
+    onOpenChat: (prompt: String?, runMode: String?) -> Unit = { _, _ -> },
 ) {
     var tab by remember { mutableIntStateOf(0) }
     if (workspace == null) {
@@ -129,7 +129,7 @@ fun FlowScreen(
 private fun JiraTasksTab(
     container: AppContainer,
     workspace: String,
-    onOpenChat: () -> Unit,
+    onOpenChat: (prompt: String?, runMode: String?) -> Unit,
 ) {
     var issues by remember { mutableStateOf<List<ProjectIssue>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -272,7 +272,7 @@ private fun JiraTasksTab(
                                     }.onSuccess {
                                         container.hubState.selectedLaneId.value = "lane-mobile"
                                         container.refreshLanes(workspace)
-                                        onOpenChat()
+                                        onOpenChat(null, null)
                                     }.onFailure { actionError = "Falha: ${it.message}" }
                                     solving = null
                                 }
@@ -311,7 +311,7 @@ private fun JiraTasksTab(
 private fun PRsTab(
     container: AppContainer,
     workspace: String,
-    onOpenChat: () -> Unit,
+    onOpenChat: (prompt: String?, runMode: String?) -> Unit,
 ) {
     var prs by remember { mutableStateOf<List<ProjectPullRequest>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -419,21 +419,29 @@ private fun PRsTab(
                         Spacer(Modifier.height(10.dp))
                         Button(
                             onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (!pr.isMine) {
+                                    onOpenChat(reviewObjective(pr), null)
+                                    return@Button
+                                }
                                 reviewingPr = pr.number
                                 actionError = null
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 container.appScope.launch {
+                                    runCatching { container.refreshProjects() }
+                                    val lane = container.hubState.ideLane(workspace)
+                                    val mode = container.hubState.ideRunMode(workspace)
                                     runCatching {
                                         container.startRun(
-                                            laneId = "lane-mobile",
+                                            laneId = lane?.laneId ?: "lane-mobile",
                                             workspace = workspace,
-                                            objective = "Analise o PR #${pr.number} (${pr.title}) e resuma riscos, bugs e sugestões.",
-                                            runMode = "plan",
+                                            team = lane?.teamName?.takeIf { it.isNotBlank() },
+                                            objective = reviewObjective(pr),
+                                            runMode = mode,
                                         )
                                     }.onSuccess {
-                                        container.hubState.selectedLaneId.value = "lane-mobile"
+                                        lane?.let { container.hubState.selectedLaneId.value = it.laneId }
                                         container.refreshLanes(workspace)
-                                        onOpenChat()
+                                        onOpenChat(null, null)
                                     }.onFailure { actionError = "Falha: ${it.message}" }
                                     reviewingPr = null
                                 }
@@ -449,7 +457,7 @@ private fun PRsTab(
                                 .heightIn(min = 42.dp),
                         ) {
                             Text(
-                                if (reviewingPr == pr.number) "Iniciando análise…" else "Analisar c/ Equipe",
+                                if (!pr.isMine) "Revisar" else if (reviewingPr == pr.number) "Iniciando…" else "Trabalhar c/ Equipe",
                                 fontWeight = FontWeight.SemiBold,
                             )
                         }
@@ -457,6 +465,24 @@ private fun PRsTab(
                 }
             }
         }
+    }
+}
+
+private fun reviewObjective(pr: ProjectPullRequest): String {
+    val branchInfo = if (pr.headRef.isNotBlank() && pr.baseRef.isNotBlank()) {
+        " (${pr.headRef} → ${pr.baseRef})"
+    } else {
+        ""
+    }
+    val bodyPart = if (pr.body.isNotBlank()) "\n\nDescrição do PR:\n${pr.body.take(1200)}" else ""
+    val author = pr.author.ifBlank { "terceiro" }
+    return if (pr.isMine) {
+        "Atender feedback do nosso PR #${pr.number}$branchInfo — ${pr.title}. Leia o PR completo e todos os comentários/revisões dos revisores com github_get_pr antes de agir.$bodyPart"
+    } else if (pr.needsAttention && pr.myResponse.isNotBlank()) {
+        val reason = pr.attentionReason.ifBlank { "nova atualização" }.lowercase()
+        "Reavaliar PR #${pr.number} de @$author$branchInfo — ${pr.title}. Houve $reason após minha última revisão; leia os comentários mais recentes com github_get_pr antes de responder.$bodyPart"
+    } else {
+        "Revisar PR #${pr.number} de @$author$branchInfo — ${pr.title}$bodyPart"
     }
 }
 

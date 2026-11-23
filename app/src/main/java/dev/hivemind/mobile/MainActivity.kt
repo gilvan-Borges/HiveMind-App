@@ -212,6 +212,7 @@ private fun BackgroundConnectionBinder(container: AppContainer) {
 fun MainScaffold(container: AppContainer) {
     var tab by remember { mutableStateOf(MainTab.Chat) }
     var chatDraftSeed by remember { mutableStateOf<String?>(null) }
+    var chatDraftMode by remember { mutableStateOf<String?>(null) }
     val workspace by container.hubState.selectedWorkspace.collectAsState()
     val projects by container.hubState.projects.collectAsState()
     val conn by container.hubState.conn.collectAsState()
@@ -554,7 +555,9 @@ fun MainScaffold(container: AppContainer) {
                     container = container,
                     padding = padding,
                     draftSeed = chatDraftSeed,
+                    draftMode = chatDraftMode,
                     onConsumeDraftSeed = { chatDraftSeed = null },
+                    onConsumeDraftMode = { chatDraftMode = null },
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onOpenFlow = { tab = MainTab.Flow },
                     onOpenDiffs = { tab = MainTab.Diffs },
@@ -568,7 +571,24 @@ fun MainScaffold(container: AppContainer) {
                     container = container,
                     padding = padding,
                     workspace = workspace,
-                    onOpenChat = { tab = MainTab.Chat },
+                    onOpenChat = { prompt, mode ->
+                        if (!prompt.isNullOrBlank()) {
+                            val ws = workspace.orEmpty()
+                            scope.launch {
+                                runCatching { container.refreshProjects() }
+                                val ideMode = mode?.takeIf { it.isNotBlank() }
+                                    ?: container.hubState.ideRunMode(ws)
+                                chatDraftMode = ideMode
+                                container.hubState.ideLane(ws)?.let {
+                                    container.hubState.selectedLaneId.value = it.laneId
+                                }
+                                chatDraftSeed = prompt
+                                tab = MainTab.Chat
+                            }
+                            return@FlowScreen
+                        }
+                        tab = MainTab.Chat
+                    },
                 )
                 MainTab.Diffs -> DiffsScreen(
                     container = container,
