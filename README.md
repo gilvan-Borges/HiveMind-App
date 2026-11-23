@@ -52,7 +52,7 @@ Pacote `dev.hivemind.mobile` · só Android (módulo `:app`) · `versionName` **
 ### Destaques
 
 - **Dois transportes** — QR LAN/Tailscale (`hivemind://pair?v=2`) ou conta no relay (`naclbox` + TOFU)
-- **Mesmas abas** nos dois modos — Projetos, Chat, Fluxo, Diffs
+- **Mesma navegação** nos dois modos — projetos, conversas e chat; Fluxo e Diffs nas configurações
 - **Notificações** — aprovação pendente e fim de equipe (com `POST_NOTIFICATIONS`)
 - **Sem iOS** — um alvo Gradle, Compose Material 3, tema Obsidian + Brand Gold
 
@@ -103,9 +103,12 @@ Na primeira reconexão SSE (fora do relay), o app retesta as URLs do QR e troca 
 | Login | Acesso remoto | URL do relay, e-mail, senha |
 | Pareamento LAN | Do portão ou lista de IDEs | QR v2 ou colar o código |
 | IDEs | Conta relay aberta | Online/offline, controlar, vincular, revogar |
-| Projetos / Chat / Fluxo / Diffs | Transporte ativo | Trabalhar no workspace escolhido |
+| Projetos | Transporte ativo | Lista inicial: avatar, seções, prévia, hora, não lidas e busca |
+| Conversas | Dentro de um projeto | Conversas da IDE e do Agent Hive; `+` abre uma nova |
+| Chat | Dentro de uma conversa | Bolhas, card da equipe em execução e continuação da sessão |
+| Configurações | Toque no avatar | IDE conectada (LAN, Tailscale ou relay), Fluxo, Diffs e desconectar |
 
-Barra inferior só com pareamento. Relay: **Trocar IDE**. LAN: **Desconectar do PC** limpa DataStore + alias `hm_lan_device`.
+Fluxo, Diffs e o gerenciador de projetos ficam em Configurações. Relay: **Trocar IDE**. LAN: **Desconectar** limpa DataStore + alias `hm_lan_device`.
 
 ---
 

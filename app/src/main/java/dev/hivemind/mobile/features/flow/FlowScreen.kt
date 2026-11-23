@@ -84,7 +84,7 @@ fun FlowScreen(
     if (workspace == null) {
         EmptyStatePanel(
             title = "Nenhum projeto selecionado",
-            subtitle = "Escolha um projeto na aba Projetos para ver suas tasks do Jira, pull requests e Auto-Review.",
+            subtitle = "Escolha um projeto na tela inicial para ver tasks, pull requests e Auto-Review.",
             modifier = Modifier.padding(padding),
         )
         return

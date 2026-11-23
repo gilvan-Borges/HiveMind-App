@@ -7,11 +7,20 @@ import kotlinx.serialization.json.JsonElement
 // --- Health ---
 
 @Serializable
+data class OpenProject(
+    val workspace: String = "",
+    val name: String = "",
+)
+
+@Serializable
 data class Health(
     val ok: Boolean = false,
+    val online: Boolean = false,
     val hostName: String = "",
     val version: String = "",
     val time: String = "",
+    val transport: String = "",
+    val openProject: OpenProject? = null,
 )
 
 // --- Projects & Lanes ---
@@ -26,6 +35,7 @@ data class ProjectSummary(
     val composerMode: String = "",
     val runningLanes: Int = 0,
     val pendingApprovals: Int = 0,
+    val permissionMode: String = "",
 )
 
 @Serializable
@@ -89,6 +99,9 @@ data class LaneEventItem(
     val decisionMicros: Long = 0,
     val health: List<ProviderHealthView> = emptyList(),
     val at: String = "",
+    val messageId: String = "",
+    val conversationId: String = "",
+    val sessionId: String = "",
 )
 
 @Serializable
@@ -138,6 +151,9 @@ data class OrchestratorEvent(
     val estimatedMicroUsd: Long = 0,
     val decisionMicros: Long = 0,
     val health: List<ProviderHealthView> = emptyList(),
+    val messageId: String? = null,
+    val conversationId: String? = null,
+    val sessionId: String? = null,
 )
 
 @Serializable
@@ -167,6 +183,9 @@ data class SessionSummary(
     val updatedAt: String = "",
     val title: String = "",
     val jiraKey: String = "",
+    val kind: String = "",
+    val preview: String = "",
+    val unread: Int = 0,
     val inputTokens: Long = 0,
     val outputTokens: Long = 0,
     val totalTokens: Long = 0,
@@ -202,6 +221,7 @@ data class SessionDetail(
     val id: String = "",
     val title: String = "",
     val jiraKey: String = "",
+    val kind: String = "",
     val inputTokens: Long = 0,
     val outputTokens: Long = 0,
     val totalTokens: Long = 0,
@@ -304,6 +324,29 @@ data class AutoReviewStatus(
     val nextPollAt: String = "",
     val lastError: String = "",
     val history: List<AutoReviewEntry> = emptyList(),
+)
+
+/** Cartão ao vivo `activity` (phase file|command|test|other). */
+@Serializable
+data class ActivityNotice(
+    val laneId: String = "",
+    val team: String = "",
+    val author: String = "",
+    val tool: String = "",
+    val phase: String = "",
+    val target: String = "",
+    val sessionId: String = "",
+)
+
+/** Rotina do Agent Hive que o app pode pausar. */
+@Serializable
+data class RoutineInfo(
+    val id: String = "",
+    val expr: String = "",
+    val timezone: String = "",
+    val text: String = "",
+    val workstream: String = "",
+    val enabled: Boolean = false,
 )
 
 // --- Erros ---

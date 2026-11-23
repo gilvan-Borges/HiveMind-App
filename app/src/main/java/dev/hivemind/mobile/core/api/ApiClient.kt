@@ -5,7 +5,9 @@ import dev.hivemind.mobile.core.lan.HttpTransport
 import dev.hivemind.mobile.core.lan.LanSession
 import dev.hivemind.mobile.core.lan.PlainHttp
 import dev.hivemind.mobile.core.lan.WireRequest
+import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.AutoReviewStatus
+import dev.hivemind.mobile.core.models.RoutineInfo
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.core.models.Health
 import dev.hivemind.mobile.core.models.LaneSnapshot
@@ -35,6 +37,33 @@ open class ApiException(
 
 @Serializable
 data class ProjectsResponse(val projects: List<ProjectSummary> = emptyList())
+
+@Serializable
+data class ApprovalsResponse(val approvals: List<ApprovalInfo> = emptyList())
+
+@Serializable
+data class RoutinesResponse(val routines: List<RoutineInfo> = emptyList())
+
+@Serializable
+data class ReadRequest(val workspace: String, val sessionId: String)
+
+@Serializable
+data class PermissionRequest(val workspace: String, val permissionMode: String)
+
+@Serializable
+data class CommitRequest(val workspace: String, val message: String, val push: Boolean = false)
+
+@Serializable
+data class CommitResponse(val committed: Boolean = false, val summary: String = "")
+
+@Serializable
+data class PullRequestBody(val workspace: String, val title: String, val body: String = "", val baseBranch: String = "main")
+
+@Serializable
+data class PullResponse(val opened: Boolean = false, val url: String = "")
+
+@Serializable
+data class RoutineEnabledRequest(val id: String, val enabled: Boolean)
 
 @Serializable
 data class LanesResponse(val lanes: List<LaneSnapshot> = emptyList())
@@ -87,6 +116,15 @@ data class ResolveRequest(val approvalId: String, val approved: Boolean)
 @Serializable
 data class PollRequest(val workspace: String)
 
+@Serializable
+private data class ReadAck(val read: Boolean = false)
+
+@Serializable
+private data class PermissionAck(val permissionMode: String = "")
+
+@Serializable
+private data class RoutineAck(val id: String = "", val enabled: Boolean = false)
+
 /** Cliente HTTP do bridge. Na LAN o corpo é um quadro; Bearer em claro não autentica. */
 class ApiClient(
     private val json: Json,
@@ -132,6 +170,32 @@ class ApiClient(
 
     suspend fun sessions(workspace: String): WorkspaceSessionsSummary =
         get("/api/v1/sessions", mapOf("workspace" to workspace))
+
+    suspend fun markSessionRead(workspace: String, sessionId: String) {
+        post<ReadAck, ReadRequest>("/api/v1/session/read", ReadRequest(workspace, sessionId))
+    }
+
+    suspend fun approvals(workspace: String): List<ApprovalInfo> =
+        get<ApprovalsResponse>("/api/v1/approvals", mapOf("workspace" to workspace)).approvals
+
+    suspend fun setPermission(workspace: String, permissionMode: String) {
+        post<PermissionAck, PermissionRequest>(
+            "/api/v1/project/permission",
+            PermissionRequest(workspace, permissionMode),
+        )
+    }
+
+    suspend fun commit(workspace: String, message: String, push: Boolean = false): CommitResponse =
+        post("/api/v1/git/commit", CommitRequest(workspace, message, push))
+
+    suspend fun openPullRequest(workspace: String, title: String, body: String, baseBranch: String = "main"): PullResponse =
+        post("/api/v1/git/pr", PullRequestBody(workspace, title, body, baseBranch))
+
+    suspend fun routines(): List<RoutineInfo> = get<RoutinesResponse>("/api/v1/routines").routines
+
+    suspend fun setRoutineEnabled(id: String, enabled: Boolean) {
+        post<RoutineAck, RoutineEnabledRequest>("/api/v1/routines/enabled", RoutineEnabledRequest(id, enabled))
+    }
 
     suspend fun session(workspace: String, id: String): SessionDetail =
         get("/api/v1/session", mapOf("workspace" to workspace, "id" to id))

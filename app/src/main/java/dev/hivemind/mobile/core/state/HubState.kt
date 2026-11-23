@@ -1,6 +1,7 @@
 package dev.hivemind.mobile.core.state
 
 import dev.hivemind.mobile.core.lan.LanProtocol
+import dev.hivemind.mobile.core.models.ActivityNotice
 import dev.hivemind.mobile.core.models.ApprovalInfo
 import dev.hivemind.mobile.core.models.ApprovalResolvedPayload
 import dev.hivemind.mobile.core.models.AutoReviewStatus
@@ -48,6 +49,7 @@ class HubState(private val json: Json) {
     val autoreview = MutableStateFlow<Map<String, AutoReviewStatus>>(emptyMap())
     val providerHealth = MutableStateFlow<List<ProviderHealthView>>(emptyList())
     val relayGap = MutableStateFlow<RelayGapNotice?>(null)
+    val activity = MutableStateFlow<ActivityNotice?>(null)
 
     val selectedWorkspace = MutableStateFlow<String?>(null)
     val selectedLaneId = MutableStateFlow<String?>(null)
@@ -168,6 +170,9 @@ class HubState(private val json: Json) {
             decisionMicros = e.decisionMicros,
             health = e.health,
             at = now,
+            messageId = e.messageId.orEmpty(),
+            conversationId = e.conversationId.orEmpty(),
+            sessionId = e.sessionId.orEmpty(),
         )
         var approvals = snapshot.pendingApprovals
         var running = snapshot.running
@@ -270,6 +275,28 @@ class HubState(private val json: Json) {
         relayGap.value = null
     }
 
+    /** Substitui as aprovações abertas de um workspace pelo `GET /api/v1/approvals`. */
+    fun mergeApprovals(workspace: String, items: List<ApprovalInfo>) {
+        if (workspace.isBlank()) return
+        val grouped = items.groupBy { it.laneId.ifBlank { "lane-mobile" } }
+        val next = lanes.value.toMutableMap()
+        val touched = mutableSetOf<String>()
+        for ((laneId, approvals) in grouped) {
+            val current = next.values.firstOrNull { it.workspace == workspace && it.laneId == laneId }
+                ?: LaneSnapshot(workspace = workspace, laneId = laneId)
+            val updated = current.copy(workspace = workspace, laneId = laneId, pendingApprovals = approvals)
+            next[updated.key] = updated
+            touched += updated.key
+        }
+        for ((key, lane) in lanes.value) {
+            if (lane.workspace == workspace && key !in touched && lane.pendingApprovals.isNotEmpty()) {
+                next[key] = lane.copy(pendingApprovals = emptyList())
+            }
+        }
+        lanes.value = next
+        refreshPending()
+    }
+
     /**
      * Aplica o quadro resume. O hub manda no máximo 60 eventos por lane;
      * o que passar disso fica de fora para não crescer a transcrição.
@@ -333,6 +360,11 @@ class HubState(private val json: Json) {
                 val data = ev.data ?: return
                 runCatching { json.decodeFromString<ProviderHealthPayload>(data.toString()) }
                     .onSuccess { onProviderHealth(it) }
+            }
+            "activity" -> {
+                val data = ev.data ?: return
+                runCatching { json.decodeFromString<ActivityNotice>(data.toString()) }
+                    .onSuccess { activity.value = it }
             }
             "relay_gap" -> {
                 val data = ev.data ?: return
