@@ -1528,17 +1528,32 @@ private fun Composer(
                                 container.appScope.launch {
                                     val sid = stickySessionId?.takeIf { it.isNotBlank() }
                                         ?: boundSessionId.takeIf { it.isNotBlank() }
+                                    val note = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." }
+                                    val restart = RunStartRequest(
+                                        laneId = laneId,
+                                        workspace = workspace,
+                                        objective = note,
+                                        sessionId = sid,
+                                        runMode = runMode,
+                                        images = images,
+                                    )
                                     runCatching {
-                                        container.api.redirect(
-                                            RunStartRequest(
-                                                laneId = laneId,
-                                                workspace = workspace,
-                                                objective = text.ifBlank { "Analise a(s) imagem(ns) anexada(s)." },
-                                                sessionId = sid,
-                                                runMode = runMode,
-                                                images = images,
-                                            ),
-                                        )
+                                        // Texto entra na mesa redonda da execução viva.
+                                        // Imagem, host antigo (404/400) ou run já encerrada (409)
+                                        // ainda reiniciam: o steer não carrega bytes de imagem.
+                                        if (images.isEmpty()) {
+                                            try {
+                                                container.api.steer(laneId, note)
+                                            } catch (e: ApiException) {
+                                                if (e.status == 404 || e.status == 400 || e.status == 409) {
+                                                    container.api.redirect(restart)
+                                                } else {
+                                                    throw e
+                                                }
+                                            }
+                                        } else {
+                                            container.api.redirect(restart)
+                                        }
                                     }.onSuccess {
                                         text = ""
                                         images = emptyList()
@@ -1566,7 +1581,7 @@ private fun Composer(
                         } else {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
-                                contentDescription = if (running) "Redirecionar" else "Enviar",
+                                contentDescription = if (running) "Enviar nota" else "Enviar",
                                 modifier = Modifier.size(18.dp),
                             )
                         }
