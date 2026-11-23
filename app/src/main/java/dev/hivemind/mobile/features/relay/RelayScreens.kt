@@ -85,9 +85,113 @@ import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
 import dev.hivemind.mobile.ui.ErrorBanner
 import dev.hivemind.mobile.ui.HiveCard
+import dev.hivemind.mobile.ui.OnboardingHero
 import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.edgeInsets
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+@Composable
+fun GateHomePreview() {
+    GateHome(
+        accounts = emptyList(),
+        notice = null,
+        onRemote = {},
+        onLan = {},
+        onAccount = {},
+    )
+}
+
+@Composable
+fun RelayLoginPreview() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .edgeInsets()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Voltar",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+            Text(
+                "Entrar no relay",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Use a conta do servidor de relay. Dá para entrar com o QR da IDE ou com e-mail e senha.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextDim,
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BrandGold,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) { Text("Entrar com QR Code da IDE", fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(14.dp))
+        HiveCard(contentPadding = PaddingValues(16.dp)) {
+            val fieldColors = dev.hivemind.mobile.ui.hiveFieldColors()
+            OutlinedTextField(
+                value = "https://",
+                onValueChange = {},
+                label = { Text("URL do relay (https)") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = "",
+                onValueChange = {},
+                label = { Text("E-mail ou usuário") },
+                placeholder = { Text("conta@example.com") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = "",
+                onValueChange = {},
+                label = { Text("Senha") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandGold,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Entrar", fontWeight = FontWeight.SemiBold) }
+        }
+        dev.hivemind.mobile.ui.HelpDisclosure(
+            "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
+        )
+    }
+}
 
 @Composable
 fun GateScreen(container: AppContainer) {
@@ -123,27 +227,19 @@ private fun GateHome(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .edgeInsets()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Spacer(Modifier.height(12.dp))
         StatusPill(text = "E2E · Relay & LAN", color = BrandGold)
-        Spacer(Modifier.height(14.dp))
-        Text(
-            "HiveMind Mobile",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
+        Spacer(Modifier.height(20.dp))
+        OnboardingHero(
+            title = "HiveMind",
+            subtitle = "Comande sua equipe de agentes pela rede local ou por um relay próprio.",
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Comande sua equipe de agentes pela rede local ou por um relay próprio.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextDim,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         if (!notice.isNullOrBlank()) {
             ErrorBanner(message = notice)
@@ -275,24 +371,29 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
+            .edgeInsets()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Voltar",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
             }
             Text(
                 "Entrar no relay",
                 style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
-            "Use a conta criada no servidor do relay (HIVEMIND_SEED_EMAIL / initial-password.txt ou `hivemind-relay account set`).",
-            style = MaterialTheme.typography.bodySmall,
+            "Use a conta do servidor de relay. Dá para entrar com o QR da IDE ou com e-mail e senha.",
+            style = MaterialTheme.typography.bodyMedium,
             color = TextDim,
         )
         Spacer(Modifier.height(16.dp))
@@ -314,12 +415,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
         Spacer(Modifier.height(14.dp))
 
         HiveCard(contentPadding = PaddingValues(16.dp)) {
-            val fieldColors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandGold,
-                unfocusedBorderColor = ObsidianBorder,
-                focusedContainerColor = ObsidianSurface,
-                unfocusedContainerColor = ObsidianSurface,
-            )
+            val fieldColors = dev.hivemind.mobile.ui.hiveFieldColors()
             OutlinedTextField(
                 value = relayUrl,
                 onValueChange = { relayUrl = it },
@@ -338,7 +434,7 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("E-mail ou usuário") },
-                placeholder = { Text("gilvan.b ou voce@exemplo") },
+                placeholder = { Text("conta@example.com") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
@@ -394,6 +490,10 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
             Spacer(Modifier.height(12.dp))
             ErrorBanner(message = shown)
         }
+        Spacer(Modifier.height(8.dp))
+        dev.hivemind.mobile.ui.HelpDisclosure(
+            "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
+        )
     }
 }
 
@@ -444,7 +544,7 @@ private fun DeviceList(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().edgeInsets()) {
         Surface(color = ObsidianCard) {
             Column {
                 Row(
@@ -457,6 +557,7 @@ private fun DeviceList(
                         Text(
                             "Suas IDEs",
                             style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
@@ -776,9 +877,9 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
+            .edgeInsets()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
@@ -788,9 +889,18 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 },
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Voltar",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
             }
-            Text("Vincular IDE", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Vincular IDE",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+            )
         }
         Spacer(Modifier.height(6.dp))
         Text(

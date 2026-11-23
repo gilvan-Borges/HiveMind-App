@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,11 +73,64 @@ import dev.hivemind.mobile.theme.ObsidianBorder
 import dev.hivemind.mobile.theme.ObsidianSurface
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.theme.TextPrimary
 import dev.hivemind.mobile.ui.ErrorBanner
 import dev.hivemind.mobile.ui.HiveCard
+import dev.hivemind.mobile.ui.OnboardingHero
 import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.edgeInsets
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
+
+@Composable
+fun LanPairingPreview() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .edgeInsets()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = TextPrimary)
+            }
+            Text(
+                "Pareamento LAN",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        StatusPill(text = "Rede local · LAN / Tailscale", color = BrandGold)
+        Spacer(Modifier.height(20.dp))
+        OnboardingHero(
+            title = "HiveMind",
+            subtitle = "Escaneie o QR da IDE ou cole o código hivemind://pair.",
+        )
+        Spacer(Modifier.height(28.dp))
+        HiveCard(contentPadding = PaddingValues(18.dp)) {
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BrandGold,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Escanear QR Code da IDE", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {},
+                border = BorderStroke(1.dp, ObsidianBorder),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+            ) { Text("Colar código da IDE") }
+        }
+    }
+}
 
 /** Tela de pareamento LAN: QR `hivemind://pair?v=2` ou colar o mesmo código. */
 @Composable
@@ -121,37 +176,36 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
+            .edgeInsets()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 24.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (onBack != null) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = TextPrimary,
+                    )
                 }
-                Text("Pareamento LAN", style = MaterialTheme.typography.titleMedium, color = TextDim)
+                Text(
+                    "Pareamento LAN",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
         }
         StatusPill(text = "Rede local · LAN / Tailscale", color = BrandGold)
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "HiveMind Mobile",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
+        Spacer(Modifier.height(20.dp))
+        OnboardingHero(
+            title = "HiveMind",
+            subtitle = "Escaneie o QR da IDE ou cole o código hivemind://pair.",
         )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Continue e comande os trabalhos do HiveMind pelo celular.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextDim,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         HiveCard(contentPadding = PaddingValues(18.dp)) {
             Button(
@@ -181,12 +235,7 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
 
             if (showManual) {
                 Spacer(Modifier.height(14.dp))
-                val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BrandGold,
-                    unfocusedBorderColor = ObsidianBorder,
-                    focusedContainerColor = ObsidianSurface,
-                    unfocusedContainerColor = ObsidianSurface,
-                )
+                val fieldColors = dev.hivemind.mobile.ui.hiveFieldColors()
                 OutlinedTextField(
                     value = pasted,
                     onValueChange = { pasted = it },
@@ -289,13 +338,13 @@ fun QrScannerOverlay(
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
         if (!hasCamera) {
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Permissão de câmera necessária para escanear o QR.", color = androidx.compose.ui.graphics.Color.White)
+                Text("Permissão de câmera necessária para escanear o QR.", color = TextPrimary)
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                     Text("Permitir câmera")
@@ -352,22 +401,24 @@ fun QrScannerOverlay(
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, end = 8.dp)
                 .fillMaxWidth(),
         ) {
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = androidx.compose.ui.graphics.Color.White)
+                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = TextPrimary)
             }
         }
         Text(
             hint,
-            color = androidx.compose.ui.graphics.Color.White,
+            color = TextPrimary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp)
-                .background(androidx.compose.ui.graphics.Color(0x99000000)),
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+                .background(dev.hivemind.mobile.theme.ObsidianBg.copy(alpha = 0.72f)),
         )
     }
 }

@@ -5,6 +5,7 @@
         <item name="android:statusBarColor">@color/obsidian_bg</item>
         <item name="android:navigationBarColor">@color/obsidian_bg</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:forceDarkAllowed">false</item>
         <!-- windowLightNavigationBar exige API 27 e o minSdk é 26; a barra já
              é obsidian via navigationBarColor, então o item fica de fora. -->
         <item name="android:colorPrimary">@color/brand_gold</item>
@@ -22,5 +23,6 @@
         <item name="android:statusBarColor">@color/obsidian_bg</item>
         <item name="android:navigationBarColor">@color/obsidian_bg</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>
