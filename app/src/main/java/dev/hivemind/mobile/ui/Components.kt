@@ -190,8 +190,12 @@ fun EmptyStatePanel(
                             .fillMaxWidth()
                             .heightIn(min = 46.dp),
                         shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = dev.hivemind.mobile.theme.BrandGold,
+                            contentColor = dev.hivemind.mobile.theme.OnPrimary,
+                        ),
                     ) {
-                        Text(actionLabel, fontWeight = FontWeight.SemiBold)
+                        Text(actionLabel, fontWeight = FontWeight.SemiBold, color = dev.hivemind.mobile.theme.OnPrimary)
                     }
                 }
                 if (secondaryLabel != null && onSecondary != null) {

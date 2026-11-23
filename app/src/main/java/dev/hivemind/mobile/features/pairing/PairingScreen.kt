@@ -10,37 +10,25 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,15 +55,110 @@ import com.google.mlkit.vision.common.InputImage
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.core.api.PairQr
 import dev.hivemind.mobile.core.lan.LanMessages
-import dev.hivemind.mobile.theme.ObsidianBorder
-import dev.hivemind.mobile.theme.ObsidianSurface
-import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.theme.TextPrimary
+import dev.hivemind.mobile.ui.EntryBackHeader
+import dev.hivemind.mobile.ui.EntryScaffold
+import dev.hivemind.mobile.ui.EntryStep
 import dev.hivemind.mobile.ui.ErrorBanner
-import dev.hivemind.mobile.ui.HiveCard
-import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.IconField
+import dev.hivemind.mobile.ui.PillButton
+import dev.hivemind.mobile.ui.QrHero
+import dev.hivemind.mobile.ui.QuietLink
+import dev.hivemind.mobile.ui.StaticEntry
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
+
+@Composable
+fun LanPairingPreview() {
+    StaticEntry {
+        LanPairingContent(
+            onBack = {},
+            showManual = false,
+            pasted = "",
+            connecting = false,
+            error = null,
+            onScan = {},
+            onToggleManual = {},
+            onPasted = {},
+            onConnect = {},
+        )
+    }
+}
+
+@Composable
+fun LanPairingPastePreview() {
+    StaticEntry {
+        LanPairingContent(
+            onBack = {},
+            showManual = true,
+            pasted = "hivemind://pair?v=2&h=lab.local",
+            connecting = false,
+            error = null,
+            onScan = {},
+            onToggleManual = {},
+            onPasted = {},
+            onConnect = {},
+        )
+    }
+}
+
+@Composable
+fun QrScannerPreview() {
+    Box(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        Box(Modifier.align(Alignment.Center)) {
+            dev.hivemind.mobile.ui.QrHero()
+        }
+        Row(
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp, end = 8.dp).fillMaxWidth(),
+        ) {
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = {}) {
+                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = TextPrimary)
+            }
+        }
+        Text(
+            "Aponte para o QR exibido na IDE (modal App Mobile)",
+            color = TextPrimary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 24.dp),
+        )
+    }
+}
+
+@Composable
+fun QrPermissionPreview() {
+    CameraPermissionPane(onAllow = {}, onClose = {})
+}
+
+@Composable
+fun CameraPermissionPane(onAllow: () -> Unit, onClose: () -> Unit) {
+    dev.hivemind.mobile.ui.EntryScaffold(
+        footer = {
+            dev.hivemind.mobile.ui.PillButton("Permitir câmera", onAllow)
+            dev.hivemind.mobile.ui.QuietLink("Agora não", onClose)
+        },
+    ) {
+        dev.hivemind.mobile.ui.EntryBackHeader("Câmera", onClose)
+        dev.hivemind.mobile.ui.QrHero()
+        Text(
+            "A câmera lê o QR",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Sem ela o app não enxerga o código que a IDE mostra. A imagem não sai do celular.",
+            color = TextDim,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
 
 /** Tela de pareamento LAN: QR `hivemind://pair?v=2` ou colar o mesmo código. */
 @Composable
@@ -118,124 +201,87 @@ fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    LanPairingContent(
+        onBack = onBack,
+        showManual = showManual,
+        pasted = pasted,
+        connecting = connecting,
+        error = error ?: notice,
+        onScan = { scanning = true },
+        onToggleManual = { showManual = !showManual },
+        onPasted = { pasted = it },
+        onConnect = {
+            when (val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(pasted)) {
+                is PairQr.Offer -> {
+                    error = null
+                    finishPairing(container, parsed, onState = { connecting = it }, onError = { error = it })
+                }
+                PairQr.RejectedToken -> error = LanMessages.TOKEN_QR
+                PairQr.Invalid -> error = LanMessages.BAD_QR
+            }
+        },
+    )
+}
+
+@Composable
+private fun LanPairingContent(
+    onBack: (() -> Unit)?,
+    showManual: Boolean,
+    pasted: String,
+    connecting: Boolean,
+    error: String?,
+    onScan: () -> Unit,
+    onToggleManual: () -> Unit,
+    onPasted: (String) -> Unit,
+    onConnect: () -> Unit,
+) {
+    EntryScaffold(
+        footer = {
+            if (!error.isNullOrBlank()) {
+                ErrorBanner(message = error)
+            }
+            if (showManual) {
+                PillButton(text = "Conectar", onClick = onConnect, enabled = !connecting, busy = connecting)
+                QuietLink(text = "Escanear QR da IDE", onClick = onScan, enabled = !connecting)
+            } else {
+                PillButton(text = "Escanear QR da IDE", onClick = onScan, enabled = !connecting, busy = connecting)
+                QuietLink(text = "Colar código", onClick = onToggleManual, enabled = !connecting)
+            }
+        },
     ) {
         if (onBack != null) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                }
-                Text("Pareamento LAN", style = MaterialTheme.typography.titleMedium, color = TextDim)
-            }
-            Spacer(Modifier.height(8.dp))
+            EntryBackHeader(title = "LAN", onBack = onBack)
         }
-        StatusPill(text = "Rede local · LAN / Tailscale", color = BrandGold)
-        Spacer(Modifier.height(12.dp))
+        QrHero()
         Text(
-            "HiveMind Mobile",
-            style = MaterialTheme.typography.headlineMedium,
+            "Parear na rede local",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Continue e comande os trabalhos do HiveMind pelo celular.",
+            "O celular lê o QR que a IDE mostra. Os dois ficam na mesma rede.",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextDim,
+            color = dev.hivemind.mobile.theme.TextDim,
             textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(24.dp))
-
-        HiveCard(contentPadding = PaddingValues(18.dp)) {
-            Button(
-                onClick = { scanning = true },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                Text("Escanear QR Code da IDE", fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = { showManual = !showManual },
-                border = BorderStroke(1.dp, ObsidianBorder),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp),
-            ) {
-                Text(if (showManual) "Ocultar código colado" else "Colar código da IDE")
-            }
-
-            if (showManual) {
-                Spacer(Modifier.height(14.dp))
-                val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BrandGold,
-                    unfocusedBorderColor = ObsidianBorder,
-                    focusedContainerColor = ObsidianSurface,
-                    unfocusedContainerColor = ObsidianSurface,
-                )
-                OutlinedTextField(
-                    value = pasted,
-                    onValueChange = { pasted = it },
-                    label = { Text("Código hivemind://pair da IDE") },
-                    minLines = 3,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = fieldColors,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        when (val parsed = dev.hivemind.mobile.core.api.PairingParser.parse(pasted)) {
-                            is PairQr.Offer -> {
-                                error = null
-                                finishPairing(container, parsed, onState = { connecting = it }, onError = { error = it })
-                            }
-                            PairQr.RejectedToken -> error = LanMessages.TOKEN_QR
-                            PairQr.Invalid -> error = LanMessages.BAD_QR
-                        }
-                    },
-                    enabled = !connecting,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BrandGold,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                ) {
-                    if (connecting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Text("Conectar", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
-
-        val banner = error ?: notice
-        if (banner != null) {
+        Spacer(Modifier.height(18.dp))
+        EntryStep(index = 1, title = "Abra a IDE", body = "No computador, com o HiveMind aberto.")
+        EntryStep(index = 2, title = "Config > Celular", body = "Gere o QR de pareamento da rede local.")
+        EntryStep(index = 3, title = "Aponte a câmera", body = "O app conecta assim que ler o código.")
+        if (showManual) {
             Spacer(Modifier.height(12.dp))
-            ErrorBanner(message = banner)
+            IconField(
+                value = pasted,
+                onValueChange = onPasted,
+                label = "Código hivemind://pair",
+                icon = Icons.Outlined.ContentPaste,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            )
         }
     }
 }
@@ -289,20 +335,16 @@ fun QrScannerOverlay(
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
-        if (!hasCamera) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("Permissão de câmera necessária para escanear o QR.", color = androidx.compose.ui.graphics.Color.White)
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Permitir câmera")
-                }
-            }
-        } else {
-            AndroidView(
+    if (!hasCamera) {
+        CameraPermissionPane(
+            onAllow = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onClose = onClose,
+        )
+        return
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
                     val future = ProcessCameraProvider.getInstance(ctx)
@@ -347,27 +389,28 @@ fun QrScannerOverlay(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-        }
 
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, end = 8.dp)
                 .fillMaxWidth(),
         ) {
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = androidx.compose.ui.graphics.Color.White)
+                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = TextPrimary)
             }
         }
         Text(
             hint,
-            color = androidx.compose.ui.graphics.Color.White,
+            color = TextPrimary,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp)
-                .background(androidx.compose.ui.graphics.Color(0x99000000)),
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+                .background(dev.hivemind.mobile.theme.ObsidianBg.copy(alpha = 0.72f)),
         )
     }
 }

@@ -1,5 +1,6 @@
 package dev.hivemind.mobile.features.flow
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +63,8 @@ import dev.hivemind.mobile.core.models.AutoReviewEntry
 import dev.hivemind.mobile.core.models.AutoReviewStatus
 import dev.hivemind.mobile.core.models.ProjectIssue
 import dev.hivemind.mobile.core.models.ProjectPullRequest
+import dev.hivemind.mobile.features.inbox.InboxIndex
+import dev.hivemind.mobile.theme.InfoBlue
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.ErrorRed
 import dev.hivemind.mobile.theme.ObsidianBorder
@@ -67,10 +73,15 @@ import dev.hivemind.mobile.theme.ObsidianSurface
 import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.theme.TextPrimary
 import dev.hivemind.mobile.ui.EmptyStatePanel
+import dev.hivemind.mobile.ui.EntryBackHeader
 import dev.hivemind.mobile.ui.ErrorBanner
+import dev.hivemind.mobile.ui.HiveBlob
 import dev.hivemind.mobile.ui.HiveCard
+import dev.hivemind.mobile.ui.PillButton
 import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.blobColor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -78,49 +89,37 @@ fun FlowScreen(
     container: AppContainer,
     padding: PaddingValues,
     workspace: String?,
+    onBack: (() -> Unit)? = null,
     onOpenChat: (prompt: String?, runMode: String?) -> Unit = { _, _ -> },
 ) {
     var tab by remember { mutableIntStateOf(0) }
     if (workspace == null) {
-        EmptyStatePanel(
-            title = "Nenhum projeto selecionado",
-            subtitle = "Escolha um projeto na tela inicial para ver tasks, pull requests e Auto-Review.",
-            modifier = Modifier.padding(padding),
-        )
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            FlowStudio(project = "sem projeto", tab = 0, onTab = {}, onBack = onBack) {
+                dev.hivemind.mobile.ui.StudioEmpty(
+                    icon = Icons.Outlined.AccountTree,
+                    title = "Nenhum projeto selecionado",
+                    body = "Escolha um projeto na tela inicial para ver tasks, pull requests e Auto-Review.",
+                )
+            }
+        }
         return
     }
 
     val projectLeaf = workspace.substringAfterLast('\\').substringAfterLast('/').ifBlank { workspace }
 
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-        Surface(color = ObsidianCard) {
-            Column {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    Text(
-                        "Fluxo & Jira",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        projectLeaf,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextDim,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                TabRow(selectedTabIndex = tab, containerColor = ObsidianCard) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Minhas Tasks") })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("PRs") })
-                    Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Auto-Review") })
-                }
-                HorizontalDivider(color = ObsidianBorder)
+        FlowStudio(
+            project = projectLeaf,
+            tab = tab,
+            onTab = { tab = it },
+            onBack = onBack,
+        ) {
+            when (tab) {
+                0 -> JiraTasksTab(container, workspace, onOpenChat)
+                1 -> PRsTab(container, workspace, onOpenChat)
+                else -> AutoReviewTab(container, workspace)
             }
-        }
-        when (tab) {
-            0 -> JiraTasksTab(container, workspace, onOpenChat)
-            1 -> PRsTab(container, workspace, onOpenChat)
-            else -> AutoReviewTab(container, workspace)
         }
     }
 }
@@ -208,53 +207,65 @@ private fun JiraTasksTab(
         when {
             loading -> Center { CircularProgressIndicator() }
             error != null -> Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                ErrorBanner(
-                    message = error.orEmpty(),
-                    actionLabel = "Tentar",
-                    onAction = { container.appScope.launch { load() } },
+                dev.hivemind.mobile.ui.StudioEmpty(
+                    icon = Icons.Outlined.CloudOff,
+                    title = "Sem resposta da IDE",
+                    body = error.orEmpty(),
                 )
             }
-            filtered.isEmpty() -> EmptyStatePanel(
-                title = if (issues.isEmpty()) "Nenhuma task atribuída" else "Nenhum resultado",
-                subtitle = if (issues.isEmpty()) {
-                    "Tasks atribuídas a você no Jira ou GitHub aparecerão aqui."
-                } else {
-                    "Nenhuma task corresponde ao filtro \"$query\"."
-                },
-                actionLabel = if (query.isNotBlank()) "Limpar filtro" else "Atualizar",
-                onAction = {
-                    if (query.isNotBlank()) query = "" else container.appScope.launch { load() }
-                },
-            )
+            filtered.isEmpty() -> Column(
+                Modifier.fillMaxSize().padding(horizontal = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                dev.hivemind.mobile.ui.StudioEmpty(
+                    icon = Icons.Outlined.TaskAlt,
+                    title = if (issues.isEmpty()) "Nenhuma task atribuída" else "Nenhum resultado",
+                    body = if (issues.isEmpty()) {
+                        "Tasks atribuídas a você no Jira ou GitHub aparecem aqui."
+                    } else {
+                        "Nada corresponde a \"$query\"."
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                dev.hivemind.mobile.ui.PillButton(
+                    text = if (query.isNotBlank()) "Limpar filtro" else "Atualizar",
+                    onClick = {
+                        if (query.isNotBlank()) query = "" else container.appScope.launch { load() }
+                    },
+                )
+            }
             else -> LazyColumn(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(filtered, key = { it.key.ifBlank { it.title } }) { issue ->
                     HiveCard {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            StatusPill(text = issue.key, color = BrandGold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            HiveBlob(color = blobColor(InboxIndex.avatarSlot(issue.key.ifBlank { issue.title })), modifier = Modifier.size(44.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(issue.key.ifBlank { issue.source.ifBlank { "Task" } }, color = BrandGold, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    issue.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             StatusPill(
-                                text = issue.status.ifBlank { issue.source },
+                                text = issue.status.ifBlank { "aberta" },
                                 color = if (issue.status.contains("progress", true) || issue.status.contains("andamento", true)) {
                                     ApprovalAmber
                                 } else {
-                                    TextDim
+                                    InfoBlue
                                 },
                             )
-                            if (issue.isMine) {
-                                StatusPill(text = "Minha", color = SuccessGreen)
-                            }
+                            if (issue.isMine) StatusPill(text = "Minha", color = SuccessGreen)
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            issue.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Medium,
-                        )
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = {
@@ -296,7 +307,7 @@ private fun JiraTasksTab(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Iniciando equipe…")
                             } else {
-                                Text("Resolver c/ Equipe", fontWeight = FontWeight.SemiBold)
+                                Text("Resolver c/ Equipe", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -656,4 +667,131 @@ private fun AutoReviewEntryRow(e: AutoReviewEntry) {
 @Composable
 private fun Center(content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+}
+
+@Composable
+fun FlowStudio(
+    project: String,
+    tab: Int,
+    onTab: (Int) -> Unit,
+    onBack: (() -> Unit)?,
+    content: @Composable () -> Unit,
+) {
+    val tabs = listOf("Tasks", "PRs", "Review")
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to BrandGold.copy(alpha = 0.18f),
+                        1f to dev.hivemind.mobile.theme.ObsidianBg,
+                    ),
+                ),
+        )
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
+                if (onBack != null) {
+                    EntryBackHeader("Fluxo", onBack)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Text(
+                    "Fluxo",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(project, color = TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tabs.forEachIndexed { index, label ->
+                        val selected = tab == index
+                        Surface(
+                            onClick = { onTab(index) },
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) dev.hivemind.mobile.theme.ActionPrimary else ObsidianSurface,
+                            border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, dev.hivemind.mobile.theme.BorderControl),
+                            modifier = Modifier.heightIn(min = 44.dp),
+                        ) {
+                            Box(Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    label,
+                                    color = if (selected) dev.hivemind.mobile.theme.ActionPrimaryText else TextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+        }
+    }
+}
+
+@Composable
+fun FlowTasksPreview() {
+    FlowStudio(project = "org-alpha", tab = 0, onTab = {}, onBack = {}) {
+        HiveCard(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HiveBlob(color = blobColor(1), modifier = Modifier.size(44.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("PROJ-123", color = BrandGold, fontWeight = FontWeight.SemiBold)
+                    Text("Revisar o contraste das pílulas", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill(text = "Em andamento", color = ApprovalAmber)
+                StatusPill(text = "Minha", color = SuccessGreen)
+            }
+            Spacer(Modifier.height(12.dp))
+            PillButton("Resolver c/ Equipe", onClick = {})
+        }
+    }
+}
+
+@Composable
+fun FlowEmptyPreview() {
+    FlowStudio(project = "org-alpha", tab = 0, onTab = {}, onBack = {}) {
+        Column(Modifier.padding(horizontal = 22.dp)) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.TaskAlt,
+                title = "Nenhuma task atribuída",
+                body = "Tasks atribuídas a você no Jira ou GitHub aparecem aqui.",
+            )
+        }
+    }
+}
+
+@Composable
+fun FlowErrorPreview() {
+    FlowStudio(project = "org-alpha", tab = 0, onTab = {}, onBack = {}) {
+        Column(Modifier.padding(horizontal = 22.dp)) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.CloudOff,
+                title = "Sem resposta da IDE",
+                body = "O host respondeu 501: a IDE não está ligada.",
+            )
+        }
+    }
+}
+
+@Composable
+fun FlowPrsPreview() {
+    FlowStudio(project = "org-alpha", tab = 1, onTab = {}, onBack = {}) {
+        HiveCard(modifier = Modifier.padding(horizontal = 22.dp), highlighted = true, accentColor = ApprovalAmber) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HiveBlob(color = blobColor(2), modifier = Modifier.size(44.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("#42", color = BrandGold, fontWeight = FontWeight.SemiBold)
+                    Text("Contraste do onboarding", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                    Text("example-dev · revisão pedida", color = TextDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
 }

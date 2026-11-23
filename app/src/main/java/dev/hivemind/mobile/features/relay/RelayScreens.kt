@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,7 +25,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.DesktopWindows
+import androidx.compose.material.icons.outlined.Laptop
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,11 +70,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,11 +95,67 @@ import dev.hivemind.mobile.theme.BrandGold
 import dev.hivemind.mobile.theme.SuccessGreen
 import dev.hivemind.mobile.theme.TextDim
 import dev.hivemind.mobile.ui.EmptyStatePanel
+import dev.hivemind.mobile.ui.EntryBackHeader
+import dev.hivemind.mobile.ui.EntryBullet
+import dev.hivemind.mobile.ui.EntryScaffold
+import dev.hivemind.mobile.ui.EntryStep
 import dev.hivemind.mobile.ui.ErrorBanner
+import dev.hivemind.mobile.ui.GoldMark
+import dev.hivemind.mobile.ui.HelpDisclosure
 import dev.hivemind.mobile.ui.HiveCard
+import dev.hivemind.mobile.ui.IconField
+import dev.hivemind.mobile.ui.PillButton
+import dev.hivemind.mobile.ui.QrHero
+import dev.hivemind.mobile.ui.QuietLink
+import dev.hivemind.mobile.ui.StaticEntry
 import dev.hivemind.mobile.ui.StatusPill
+import dev.hivemind.mobile.ui.edgeInsets
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+@Composable
+fun GateHomePreview() {
+    StaticEntry {
+        GateHome(
+            accounts = emptyList(),
+            notice = null,
+            onRemote = {},
+            onLan = {},
+            onAccount = {},
+        )
+    }
+}
+
+@Composable
+fun RelayLoginPreview() {
+    StaticEntry { RelayEntryPreview(emailOpen = false) }
+}
+
+@Composable
+fun RelayLoginEmailPreview() {
+    StaticEntry { RelayEntryPreview(emailOpen = true, showPassword = true, password = "senha-exemplo") }
+}
+
+@Composable
+private fun RelayEntryPreview(emailOpen: Boolean, showPassword: Boolean = false, password: String = "") {
+    RelayEntry(
+        relayUrl = "https://relay.example.com",
+        email = if (emailOpen) "conta@example.com" else "",
+        password = password,
+        showPassword = showPassword,
+        emailOpen = emailOpen,
+        busy = false,
+        error = null,
+        onRelayUrl = {},
+        onEmail = {},
+        onPassword = {},
+        onTogglePassword = {},
+        onToggleEmail = {},
+        onScan = {},
+        onSubmit = {},
+        onBack = {},
+    )
+}
 
 @Composable
 fun GateScreen(container: AppContainer) {
@@ -120,102 +188,90 @@ private fun GateHome(
     onLan: () -> Unit,
     onAccount: (AccountMeta) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    EntryScaffold(
+        footer = {
+            if (!notice.isNullOrBlank()) {
+                ErrorBanner(message = notice)
+            }
+            PillButton(text = "Acesso remoto", onClick = onRemote)
+            PillButton(text = "Parear na rede local", onClick = onLan, primary = false)
+        },
     ) {
-        StatusPill(text = "E2E · Relay & LAN", color = BrandGold)
-        Spacer(Modifier.height(14.dp))
+        GoldMark()
         Text(
-            "HiveMind Mobile",
-            style = MaterialTheme.typography.headlineMedium,
+            "HiveMind",
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Comande sua equipe de agentes pela rede local ou por um relay próprio.",
+            "Comande a equipe de agentes pelo celular.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextDim,
             textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(24.dp))
-
-        if (!notice.isNullOrBlank()) {
-            ErrorBanner(message = notice)
-            Spacer(Modifier.height(16.dp))
-        }
-
-        HiveCard(contentPadding = PaddingValues(18.dp)) {
-            Button(
-                onClick = onRemote,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                Text("Acesso remoto", fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = onLan,
-                border = BorderStroke(1.dp, ObsidianBorder),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-            ) {
-                Text("Parear na rede local")
-            }
-        }
-
+        Spacer(Modifier.height(28.dp))
+        EntryBullet(
+            icon = Icons.Outlined.Groups,
+            title = "Projetos e conversas",
+            body = "A mesma equipe da IDE, com prévia e não lidas.",
+        )
+        EntryBullet(
+            icon = Icons.Outlined.QrCodeScanner,
+            title = "Pareia por QR",
+            body = "Rede local, Tailscale ou um relay seu.",
+        )
+        EntryBullet(
+            icon = Icons.Outlined.Shield,
+            title = "Canal cifrado",
+            body = "Sessão local ou caixa E2E até a IDE.",
+        )
         if (accounts.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
                 "CONTAS SALVAS",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextDim,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
             )
             Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                accounts.forEach { account ->
-                    HiveCard(
-                        onClick = { onAccount(account) },
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            accounts.forEach { account ->
+                Surface(
+                    onClick = { onAccount(account) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = ObsidianCard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    account.email,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    hostOf(account.relayUrl),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextDim,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Text("›", style = MaterialTheme.typography.titleMedium, color = BrandGold)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                account.email,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                hostOf(account.relayUrl),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextDim,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = TextDim,
+                        )
                     }
                 }
             }
@@ -230,6 +286,8 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
     var relayUrl by remember(draft?.id) { mutableStateOf(draft?.relayUrl ?: "https://") }
     var email by remember(draft?.id) { mutableStateOf(draft?.email ?: "") }
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+    var emailOpen by remember(draft?.id) { mutableStateOf(!draft?.email.isNullOrBlank()) }
     var busy by remember { mutableStateOf(false) }
     var scanningQr by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -272,127 +330,132 @@ fun LoginScreen(container: AppContainer, onBack: () -> Unit, onLoggedIn: () -> U
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+    RelayEntry(
+        relayUrl = relayUrl,
+        email = email,
+        password = password,
+        showPassword = showPassword,
+        emailOpen = emailOpen,
+        busy = busy,
+        error = error ?: lastError,
+        onRelayUrl = { relayUrl = it },
+        onEmail = { email = it },
+        onPassword = { password = it },
+        onTogglePassword = { showPassword = !showPassword },
+        onToggleEmail = { emailOpen = !emailOpen },
+        onScan = { scanningQr = true },
+        onSubmit = { submit() },
+        onBack = onBack,
+    )
+}
+
+@Composable
+private fun RelayEntry(
+    relayUrl: String,
+    email: String,
+    password: String,
+    showPassword: Boolean,
+    emailOpen: Boolean,
+    busy: Boolean,
+    error: String?,
+    onRelayUrl: (String) -> Unit,
+    onEmail: (String) -> Unit,
+    onPassword: (String) -> Unit,
+    onTogglePassword: () -> Unit,
+    onToggleEmail: () -> Unit,
+    onScan: () -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit,
+) {
+    EntryScaffold(
+        footer = {
+            if (!error.isNullOrBlank()) {
+                ErrorBanner(message = error)
             }
+            if (emailOpen) {
+                PillButton(text = "Entrar", onClick = onSubmit, enabled = !busy, busy = busy)
+                QuietLink(text = "Escanear QR da IDE", onClick = onScan, enabled = !busy)
+            } else {
+                PillButton(text = "Escanear QR da IDE", onClick = onScan, enabled = !busy, busy = busy)
+                QuietLink(text = "Entrar com e-mail", onClick = onToggleEmail, enabled = !busy)
+            }
+        },
+    ) {
+        EntryBackHeader(title = "Relay", onBack = onBack)
+        if (!emailOpen) {
+            QrHero()
             Text(
                 "Entrar no relay",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Na IDE, gere o QR de acesso remoto e aponte a câmera.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextDim,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(18.dp))
+            EntryStep(index = 1, title = "Abra a IDE", body = "No computador, com o HiveMind aberto.")
+            EntryStep(index = 2, title = "Acesso remoto", body = "Gere o QR para entrar no celular.")
+            EntryStep(index = 3, title = "Aponte a câmera", body = "O app entra na conta sem digitar senha.")
+        } else {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "Entrar com e-mail",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
             )
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Use a conta criada no servidor do relay (HIVEMIND_SEED_EMAIL / initial-password.txt ou `hivemind-relay account set`).",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextDim,
-        )
-        Spacer(Modifier.height(16.dp))
-
-        Button(
-            onClick = { scanningQr = true },
-            enabled = !busy,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-        ) {
-            Text("Entrar com QR Code da IDE", fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(14.dp))
-
-        HiveCard(contentPadding = PaddingValues(16.dp)) {
-            val fieldColors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandGold,
-                unfocusedBorderColor = ObsidianBorder,
-                focusedContainerColor = ObsidianSurface,
-                unfocusedContainerColor = ObsidianSurface,
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Use a conta criada no servidor do relay.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextDim,
             )
-            OutlinedTextField(
+            Spacer(Modifier.height(22.dp))
+            IconField(
                 value = relayUrl,
-                onValueChange = { relayUrl = it },
-                label = { Text("URL do relay (https)") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onRelayUrl,
+                label = "URL do relay",
+                icon = Icons.Outlined.Link,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            IconField(
                 value = email,
-                onValueChange = { email = it },
-                label = { Text("E-mail ou usuário") },
-                placeholder = { Text("gilvan.b ou voce@exemplo") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onEmail,
+                label = "E-mail ou usuário",
+                icon = Icons.Outlined.Email,
+                placeholder = "conta@example.com",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            IconField(
                 value = password,
-                onValueChange = { password = it },
-                label = { Text("Senha") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { submit() }),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = onPassword,
+                label = "Senha",
+                icon = Icons.Outlined.Lock,
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                trailing = {
+                    IconButton(onClick = onTogglePassword, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (showPassword) "Ocultar senha" else "Mostrar senha",
+                        )
+                    }
+                },
             )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { submit() },
-                enabled = !busy,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandGold,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text("Entrar", fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        val shown = error ?: lastError
-        if (!shown.isNullOrBlank()) {
-            Spacer(Modifier.height(12.dp))
-            ErrorBanner(message = shown)
+            HelpDisclosure(
+                "A conta nasce no servidor do relay. O e-mail inicial pode estar em HIVEMIND_SEED_EMAIL, em initial-password.txt ou no comando hivemind-relay account set.",
+            )
         }
     }
 }
@@ -444,122 +507,27 @@ private fun DeviceList(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Surface(color = ObsidianCard) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Suas IDEs",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" · "),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextDim,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (conn is ConnState.Connecting || conn is ConnState.Reconnecting) {
-                        StatusPill(
-                            text = if (conn is ConnState.Reconnecting) "Reconectando…" else "Conectando…",
-                            color = ApprovalAmber,
-                            showDot = true,
-                        )
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                ) {
-                    Button(
-                        onClick = onLink,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandGold,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                    ) {
-                        Text("Vincular IDE", fontWeight = FontWeight.SemiBold)
-                    }
-                    OutlinedButton(
-                        onClick = { showAccounts = true },
-                        border = BorderStroke(1.dp, ObsidianBorder),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text("Contas")
-                    }
-                }
-                HorizontalDivider(color = ObsidianBorder)
+    IdeGallery(
+        subtitle = listOfNotNull(active?.email, active?.relayUrl?.let(::hostOf)).joinToString(" · "),
+        route = "Relay",
+        devices = devices,
+        error = localError ?: error,
+        busyId = busyId,
+        connecting = conn is ConnState.Connecting || conn is ConnState.Reconnecting,
+        onOpen = { device ->
+            busyId = device.id
+            localError = null
+            container.appScope.launch {
+                runCatching { container.relay.connect(device.id) }
+                    .onFailure { localError = it.message }
+                busyId = null
             }
-        }
-
-        val shown = localError ?: error
-        if (!shown.isNullOrBlank()) {
-            ErrorBanner(
-                message = shown,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-
-        if (devices.isEmpty()) {
-            EmptyStatePanel(
-                title = "Nenhuma IDE vinculada",
-                subtitle = "Gere um código na IDE (Acesso remoto) ou escaneie o QR para começar.",
-                actionLabel = "Vincular primeira IDE",
-                onAction = onLink,
-                secondaryLabel = "Pareamento na rede local",
-                onSecondary = onLan,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                items(devices, key = { it.id }) { device ->
-                    DeviceRow(
-                        device = device,
-                        busy = busyId == device.id,
-                        onOpen = {
-                            busyId = device.id
-                            localError = null
-                            container.appScope.launch {
-                                runCatching { container.relay.connect(device.id) }
-                                    .onFailure { localError = it.message }
-                                busyId = null
-                            }
-                        },
-                        onRevoke = { revoke = device },
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                TextButton(onClick = onLan, modifier = Modifier.heightIn(min = 44.dp)) {
-                    Text("Pareamento na rede local", color = TextDim)
-                }
-            }
-        }
-    }
+        },
+        onRevoke = { revoke = it },
+        onLink = onLink,
+        onAccounts = { showAccounts = true },
+        onLan = onLan,
+    )
 
     if (revoke != null) {
         val target = revoke!!
@@ -654,83 +622,141 @@ private fun DeviceList(
 @Composable
 private fun DeviceRow(
     device: DeviceInfo,
+    route: String,
     busy: Boolean,
     onOpen: () -> Unit,
     onRevoke: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-
-    HiveCard(
-        highlighted = device.online,
-        accentColor = SuccessGreen,
-        onClick = { if (!busy) onOpen() },
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+    val laptop = device.name.contains("note", ignoreCase = true) || device.name.contains("book", ignoreCase = true)
+    HiveCard(highlighted = device.online, accentColor = if (device.online) SuccessGreen else ObsidianBorder) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .background(if (device.online) SuccessGreen else TextDim, CircleShape),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                device.name.ifBlank { device.id },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            StatusPill(
-                text = if (device.online) "online" else "offline",
-                color = if (device.online) SuccessGreen else TextDim,
-            )
+                Modifier
+                    .size(64.dp)
+                    .background(ObsidianSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (laptop) Icons.Outlined.Laptop else Icons.Outlined.DesktopWindows,
+                    contentDescription = null,
+                    tint = BrandGold,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    device.name.ifBlank { "IDE" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (device.online) {
+                        dev.hivemind.mobile.ui.PulseDot(SuccessGreen)
+                    } else {
+                        Box(Modifier.size(8.dp).background(TextDim, CircleShape))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (device.online) "online" else "offline", color = if (device.online) SuccessGreen else TextDim)
+                }
+            }
             Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "Ações", tint = TextDim)
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Revogar vínculo", color = ErrorRed) },
-                        onClick = {
-                            menuOpen = false
-                            onRevoke()
-                        },
+                        onClick = { menuOpen = false; onRevoke() },
                     )
                 }
             }
         }
-        if (!device.e2eReady) {
-            Spacer(Modifier.height(6.dp))
-            StatusPill(text = "Criptografia ainda incompleta", color = ApprovalAmber)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill(text = route, color = BrandGold)
+            StatusPill(
+                text = if (device.e2eReady) "E2E pronto" else "E2E incompleto",
+                color = if (device.e2eReady) SuccessGreen else ApprovalAmber,
+            )
         }
         Spacer(Modifier.height(12.dp))
-        Button(
+        dev.hivemind.mobile.ui.PillButton(
+            text = "Controlar",
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onOpen()
             },
             enabled = !busy,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandGold,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp),
-        ) {
-            if (busy) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+            busy = busy,
+        )
+    }
+}
+
+@Composable
+private fun IdeGallery(
+    subtitle: String,
+    route: String,
+    devices: List<DeviceInfo>,
+    error: String?,
+    busyId: String?,
+    connecting: Boolean,
+    onOpen: (DeviceInfo) -> Unit,
+    onRevoke: (DeviceInfo) -> Unit,
+    onLink: () -> Unit,
+    onAccounts: () -> Unit,
+    onLan: () -> Unit,
+) {
+    dev.hivemind.mobile.ui.EntryScaffold(
+        footer = {
+            if (connecting) {
+                StatusPill(text = "Conectando…", color = ApprovalAmber, showDot = true)
+            }
+            dev.hivemind.mobile.ui.PillButton("Vincular IDE", onLink)
+            dev.hivemind.mobile.ui.QuietLink("Contas", onAccounts)
+            dev.hivemind.mobile.ui.QuietLink("Parear na rede local", onLan)
+        },
+    ) {
+        Text(
+            "Suas IDEs",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, color = TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(16.dp))
+        if (!error.isNullOrBlank()) {
+            ErrorBanner(message = error)
+            Spacer(Modifier.height(12.dp))
+        }
+        if (devices.isEmpty() && error.isNullOrBlank()) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.Computer,
+                title = "Nenhuma IDE vinculada",
+                body = "Gere um código na IDE, em Acesso remoto, ou escaneie o QR.",
+            )
+        } else if (devices.isEmpty()) {
+            dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.CloudOff,
+                title = "Não deu para listar as IDEs",
+                body = error.orEmpty(),
+            )
+        } else {
+            devices.forEach { device ->
+                DeviceRow(
+                    device = device,
+                    route = route,
+                    busy = busyId == device.id,
+                    onOpen = { onOpen(device) },
+                    onRevoke = { onRevoke(device) },
                 )
-            } else {
-                Text("Controlar IDE", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
@@ -776,9 +802,9 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
+            .edgeInsets()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(
@@ -788,9 +814,18 @@ private fun LinkIdeScreen(container: AppContainer, onBack: () -> Unit) {
                 },
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Voltar",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
             }
-            Text("Vincular IDE", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Vincular IDE",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+            )
         }
         Spacer(Modifier.height(6.dp))
         Text(
@@ -1015,6 +1050,128 @@ private fun CreateMemberDialog(onDismiss: () -> Unit, onSubmit: (String, String)
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
+}
+
+@Composable
+fun GateAccountsPreview() {
+    StaticEntry {
+        GateHome(
+            accounts = listOf(
+                dev.hivemind.mobile.core.relay.AccountMeta("a1", "conta@example.com", "owner", "https://relay.example.com"),
+            ),
+            notice = null,
+            onRemote = {},
+            onLan = {},
+            onAccount = {},
+        )
+    }
+}
+
+@Composable
+fun RelayErrorPreview() {
+    StaticEntry {
+        RelayEntry(
+            relayUrl = "https://relay.example.com",
+            email = "conta@example.com",
+            password = "",
+            showPassword = false,
+            emailOpen = true,
+            busy = false,
+            error = "Senha recusada. Confira a conta ou gere um QR novo na IDE.",
+            onRelayUrl = {},
+            onEmail = {},
+            onPassword = {},
+            onTogglePassword = {},
+            onToggleEmail = {},
+            onScan = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Composable
+fun DevicesPreview() {
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com · relay.example.com",
+            route = "Relay",
+            devices = listOf(
+                DeviceInfo(id = "ide-1", name = "pc-lab", online = true, e2eReady = true),
+                DeviceInfo(id = "ide-2", name = "notebook", online = false, e2eReady = false),
+            ),
+            error = null,
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
+        )
+    }
+}
+
+@Composable
+fun DevicesEmptyPreview() {
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com",
+            route = "Relay",
+            devices = emptyList(),
+            error = null,
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
+        )
+    }
+}
+
+@Composable
+fun DevicesErrorPreview() {
+    StaticEntry {
+        IdeGallery(
+            subtitle = "conta@example.com",
+            route = "Relay",
+            devices = emptyList(),
+            error = "O relay não respondeu. Tente de novo em instantes.",
+            busyId = null,
+            connecting = false,
+            onOpen = {},
+            onRevoke = {},
+            onLink = {},
+            onAccounts = {},
+            onLan = {},
+        )
+    }
+}
+
+@Composable
+fun LinkIdePreview() {
+    Column(Modifier.fillMaxSize().edgeInsets().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text("Vincular IDE", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text("Os dois lados precisam estar na mesma conta. O código vale 10 minutos.", color = TextDim, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(14.dp))
+        HiveCard(contentPadding = PaddingValues(16.dp)) {
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGold, contentColor = MaterialTheme.colorScheme.onPrimary),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Escanear QR da IDE", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = "",
+                onValueChange = {},
+                label = { Text("Ou digite o código (ABCD-EFGH-JK)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 }
 
 private fun hostOf(url: String): String =

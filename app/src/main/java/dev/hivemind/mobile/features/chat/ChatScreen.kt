@@ -288,6 +288,23 @@ fun ChatThreadPreview() {
                     false,
                 ),
             )
+            ActivityCard(
+                activities = listOf(
+                    dev.hivemind.mobile.core.models.ActivityNotice(
+                        author = "Dev",
+                        phase = "file",
+                        target = "ui/EntryChrome.kt",
+                        tool = "edit",
+                    ),
+                    dev.hivemind.mobile.core.models.ActivityNotice(
+                        author = "QA",
+                        phase = "test",
+                        target = "OnboardingPaparazziTest",
+                        tool = "test",
+                    ),
+                ),
+                onStop = {},
+            )
             RunningAgentCard(
                 lane = LaneSnapshot(laneId = "resident", teamName = "Agent Hive", objective = "Unificado com a IDE", running = true, stage = "em execução"),
                 onOpenFlow = {},
@@ -322,6 +339,67 @@ fun ChatThreadPreview() {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = OnPrimary, modifier = Modifier.size(18.dp))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatEmptyPreview() {
+    Column(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        ConversationHeader("org-alpha", {}, {}, {}, {}, null)
+        StarterEmptyChat(onPickStarter = {}, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+fun ChatErrorPreview() {
+    Column(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        ConversationHeader("org-alpha", {}, {}, {}, {}, null)
+        dev.hivemind.mobile.ui.ErrorBanner(
+            message = "A IDE caiu no meio da resposta. A mensagem ficou na fila e tenta de novo.",
+            modifier = Modifier.padding(12.dp),
+        )
+        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            DisplayItemRow(ChatDisplayItem.TextBubble("Você", "Roda os testes do módulo de inbox.", true))
+        }
+    }
+}
+
+@Composable
+fun ChatApprovalPreview() {
+    Column(
+        Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ConversationHeader("Agent Hive", {}, {}, {}, {}, null)
+        HiveCard(
+            highlighted = true,
+            accentColor = ApprovalAmber,
+            containerColor = ApprovalAmber.copy(alpha = 0.08f),
+            contentPadding = PaddingValues(14.dp),
+        ) {
+            StatusPill(text = "Aprovação pendente", color = ApprovalAmber, showDot = true)
+            Spacer(Modifier.height(8.dp))
+            Text("Editar arquivo", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "O Dev quer gravar ui/EntryChrome.kt. A mudança só entra com a sua aprovação.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = {},
+                    border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.45f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                ) { Text("Recusar", color = ErrorRed, fontWeight = FontWeight.SemiBold) }
+                Button(
+                    onClick = {},
+                    colors = ButtonDefaults.buttonColors(containerColor = InfoBlue, contentColor = OnPrimary),
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                ) { Text("Aprovar", color = OnPrimary, fontWeight = FontWeight.SemiBold) }
             }
         }
     }

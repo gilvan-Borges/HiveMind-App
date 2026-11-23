@@ -99,9 +99,9 @@ Na primeira reconexão SSE (fora do relay), o app retesta as URLs do QR e troca 
 
 | Tela | Quando | O que você faz |
 | --- | --- | --- |
-| Portão | Sem pareamento / sem sessão | Acesso remoto, parear LAN ou conta gravada |
-| Login | Acesso remoto | URL do relay, e-mail, senha |
-| Pareamento LAN | Do portão ou lista de IDEs | QR v2 ou colar o código |
+| Portão | Sem pareamento / sem sessão | Marca, o que o app faz, e no rodapé Acesso remoto ou parear LAN |
+| Login | Acesso remoto | QR da IDE em destaque; e-mail e senha ficam em Entrar com e-mail |
+| Pareamento LAN | Do portão ou lista de IDEs | Visor de QR e três passos; colar o código é o caminho secundário |
 | IDEs | Conta relay aberta | Online/offline, controlar, vincular, revogar |
 | Projetos | Transporte ativo | Lista inicial: avatar, seções, prévia, hora, não lidas e busca |
 | Conversas | Dentro de um projeto | Conversas da IDE e do Agent Hive; `+` abre uma nova |
@@ -157,14 +157,14 @@ Câmera opcional no manifesto: sem ela, cole o `hivemind://pair?v=2`.
 ### A) Mesma Wi‑Fi / Tailscale
 
 1. Na IDE, abra o QR do App Mobile (`hivemind://pair?v=2` com `urls`, `offer`, `pk`, `exp`; `host` opcional)
-2. No app: **Parear na rede local** → escanear ou colar
+2. No app: **Parear na rede local** → **Escanear QR da IDE** (ou **Colar código**)
 3. `GET /api/v1/health` nas URLs → `POST /api/v1/pair/redeem` (caixa X25519) → SSE
 
 QR `hivemind://link` nessa tela é recusado (é fluxo de relay).
 
 ### B) Fora de casa — Relay
 
-1. **Acesso remoto** → URL `https://…`, e-mail, senha (tokens `hmr_at_` / `hmr_rt_`)
+1. **Acesso remoto** → escanear o QR da IDE, ou **Entrar com e-mail** (URL `https://…`, e-mail, senha; tokens `hmr_at_` / `hmr_rt_`)
 2. **Controlar IDE** numa máquina que já publicou a chave pública
 3. Vincular com `hivemind://link` (código 10 chars, 10 min, uso único) — mesma conta nos dois lados
 4. Plano de dados: `enc: "naclbox"` (X25519 + XSalsa20-Poly1305)

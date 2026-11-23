@@ -666,6 +666,168 @@ fun ConversationsInboxPreview() {
 }
 
 @Composable
+fun ProjectsEmptyPreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "HiveMind",
+        showMark = true,
+        query = "",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "IDE online · LAN · acme",
+        back = null,
+    ) {
+        InboxBody(
+            loading = false,
+            error = null,
+            empty = true,
+            emptyTitle = "Nenhum projeto aberto na IDE",
+            emptyBody = "Abra uma pasta na HiveMind do computador para ela aparecer aqui.",
+            noResults = false,
+            onRetry = {},
+        ) {}
+    }
+}
+
+@Composable
+fun ProjectsErrorPreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "HiveMind",
+        showMark = true,
+        query = "",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "Sem conexão",
+        back = null,
+    ) {
+        InboxBody(
+            loading = false,
+            error = "A IDE não respondeu. Confira se o computador está na mesma rede.",
+            empty = true,
+            emptyTitle = "",
+            emptyBody = "",
+            noResults = false,
+            onRetry = {},
+        ) {}
+    }
+}
+
+@Composable
+fun ProjectsSearchPreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "HiveMind",
+        showMark = true,
+        query = "inexistente",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "IDE online · LAN · acme",
+        back = null,
+    ) {
+        InboxBody(
+            loading = false,
+            error = null,
+            empty = false,
+            emptyTitle = "",
+            emptyBody = "",
+            noResults = true,
+            onRetry = {},
+        ) {}
+    }
+}
+
+@Composable
+fun ProjectsOfflinePreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "HiveMind",
+        showMark = true,
+        query = "",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "IDE offline · Relay",
+        back = null,
+    ) {
+        PreviewSections(sampleProjectSections())
+    }
+}
+
+@Composable
+fun ProjectsLoadingPreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "HiveMind",
+        showMark = true,
+        query = "",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "Conectando…",
+        back = null,
+    ) {
+        InboxBody(
+            loading = true,
+            error = null,
+            empty = true,
+            emptyTitle = "",
+            emptyBody = "",
+            noResults = false,
+            onRetry = {},
+        ) {}
+    }
+}
+
+@Composable
+fun ConversationsEmptyPreview() {
+    InboxScaffold(
+        padding = PaddingValues(0.dp),
+        title = "org-alpha",
+        showMark = true,
+        query = "",
+        onQuery = {},
+        onProfile = {},
+        onCreate = {},
+        onRefresh = {},
+        profileInitial = "A",
+        statusLabel = "IDE online · Relay · org-alpha",
+        back = {},
+    ) {
+        InboxBody(
+            loading = false,
+            error = null,
+            empty = true,
+            emptyTitle = "Nenhuma conversa neste projeto",
+            emptyBody = "Toque em + para abrir uma conversa da equipe ou do Agent Hive.",
+            noResults = false,
+            onRetry = {},
+        ) {}
+    }
+}
+
+@Composable
+fun KindDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        ConversationsInboxPreview()
+        KindDialog(onEquipe = {}, onHive = {}, onDismiss = {})
+    }
+}
+
+@Composable
 private fun PreviewSections(sections: List<InboxSection<out Any>>) {
     when (val first = sections.firstOrNull()?.rows?.firstOrNull()) {
         is ProjectRow -> Sections(sections as List<InboxSection<ProjectRow>>, onToggle = {}) { row ->

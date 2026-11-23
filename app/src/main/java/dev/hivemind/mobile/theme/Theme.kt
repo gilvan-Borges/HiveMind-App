@@ -3,9 +3,12 @@
 package dev.hivemind.mobile.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
+import androidx.compose.ui.Modifier
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -145,45 +148,48 @@ val MonoFonts = FontFamily(
     Font(R.font.jetbrains_mono_medium, weight = FontWeight.Medium),
 )
 
+private fun hiveText(
+    size: androidx.compose.ui.unit.TextUnit,
+    line: androidx.compose.ui.unit.TextUnit,
+    weight: FontWeight = FontWeight.Normal,
+    tracking: androidx.compose.ui.unit.TextUnit = 0.sp,
+    family: FontFamily = HiveFonts,
+) = TextStyle(
+    fontSize = size,
+    lineHeight = line,
+    fontWeight = weight,
+    letterSpacing = tracking,
+    fontFamily = family,
+)
+
 private val HiveMindTypography = Typography(
-    headlineMedium = TextStyle(
-        fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.4).sp, fontFamily = HiveFonts,
-    ),
-    headlineSmall = TextStyle(
-        fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.2).sp, fontFamily = HiveFonts,
-    ),
-    titleLarge = TextStyle(
-        fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.2).sp, fontFamily = HiveFonts,
-    ),
-    titleMedium = TextStyle(
-        fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
-    ),
-    titleSmall = TextStyle(
-        fontSize = 13.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
-    ),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontFamily = HiveFonts),
-    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontFamily = HiveFonts),
-    labelLarge = TextStyle(
-        fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = HiveFonts,
-    ),
-    labelMedium = TextStyle(
-        fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, fontFamily = HiveFonts,
-    ),
-    labelSmall = TextStyle(
-        fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, fontFamily = HiveFonts,
-    ),
+    displaySmall = hiveText(36.sp, 42.sp, FontWeight.Bold, (-0.8).sp),
+    headlineMedium = hiveText(26.sp, 32.sp, FontWeight.Bold, (-0.4).sp),
+    headlineSmall = hiveText(21.sp, 27.sp, FontWeight.Bold, (-0.2).sp),
+    titleLarge = hiveText(20.sp, 26.sp, FontWeight.Bold, (-0.2).sp),
+    titleMedium = hiveText(15.sp, 21.sp, FontWeight.SemiBold),
+    titleSmall = hiveText(13.5.sp, 19.sp, FontWeight.SemiBold),
+    bodyMedium = hiveText(14.sp, 20.sp),
+    bodySmall = hiveText(13.sp, 18.sp),
+    labelLarge = hiveText(13.sp, 18.sp, FontWeight.SemiBold),
+    labelMedium = hiveText(12.sp, 16.sp, FontWeight.Medium),
+    labelSmall = hiveText(11.sp, 14.sp, FontWeight.Medium),
 )
 
 @Composable
 fun HiveMindTheme(content: @Composable () -> Unit) {
     // Dark-only na paleta Havrus Obsidian & Brand Gold (SDD Spec 001).
+    // Surface define LocalContentColor = onBackground. Sem isso o Text fica preto.
     MaterialTheme(
         colorScheme = HiveMindScheme,
         shapes = HiveMindShapes,
         typography = HiveMindTypography,
-        content = content,
-    )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = HiveMindScheme.background,
+            contentColor = HiveMindScheme.onBackground,
+            content = content,
+        )
+    }
 }

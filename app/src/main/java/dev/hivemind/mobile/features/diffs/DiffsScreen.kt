@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -47,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
+import dev.hivemind.mobile.core.models.DiffLine
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.DiffAddedBg
@@ -73,14 +77,26 @@ fun DiffsScreen(
     container: AppContainer,
     padding: PaddingValues,
     workspace: String?,
+    onBack: (() -> Unit)? = null,
     onAskInChat: (String) -> Unit = {},
 ) {
     if (workspace == null) {
-        EmptyStatePanel(
-            title = "Nenhum projeto selecionado",
-            subtitle = "Selecione um projeto na tela inicial para inspecionar os diffs do workspace.",
-            modifier = Modifier.padding(padding),
-        )
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            DiffsStudio(
+                files = emptyList(),
+                loading = false,
+                error = null,
+                notice = null,
+                busy = false,
+                emptyTitle = "Nenhum projeto selecionado",
+                emptyBody = "Volte e escolha um projeto para ver o que mudou.",
+                onFile = {},
+                onCommit = {},
+                onPr = {},
+                onRefresh = {},
+                onBack = onBack,
+            )
+        }
         return
     }
 
@@ -118,115 +134,20 @@ fun DiffsScreen(
         return
     }
 
-    val totalAdded = files.sumOf { it.added }
-    val totalRemoved = files.sumOf { it.removed }
-
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-        Surface(color = ObsidianCard) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Diffs",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        if (!loading && error == null && files.isNotEmpty()) {
-                            Text(
-                                "${files.size} arquivo(s) · +$totalAdded -$totalRemoved",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextDim,
-                            )
-                        }
-                    }
-                    TextButton(onClick = { commitOpen = true }, enabled = files.isNotEmpty() && !busy) { Text("Aprovar commit") }
-                    TextButton(onClick = { prOpen = true }, enabled = !busy) { Text("Aprovar PR") }
-                    IconButton(
-                        onClick = { container.appScope.launch { load() } },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Atualizar", tint = TextDim)
-                    }
-                }
-                HorizontalDivider(color = ObsidianBorder)
-            }
-        }
-        if (!notice.isNullOrBlank()) {
-            Text(
-                notice.orEmpty(),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = SuccessGreen,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        when {
-            loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            error != null -> Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                ErrorBanner(
-                    message = error.orEmpty(),
-                    actionLabel = "Tentar",
-                    onAction = { container.appScope.launch { load() } },
-                )
-            }
-            files.isEmpty() -> EmptyStatePanel(
-                title = "Workspace limpo",
-                subtitle = "Nenhuma alteração pendente de commit neste projeto.",
-                actionLabel = "Atualizar",
-                onAction = { container.appScope.launch { load() } },
-            )
-            else -> LazyColumn(
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(files, key = { it.path }) { f ->
-                    val (mark, markColor) = statusStyle(f.status)
-                    HiveCard(
-                        onClick = { selected = f },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            StatusPill(text = mark, color = markColor)
-                            Text(
-                                f.path,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = MonoFonts,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (f.added > 0) {
-                                Text(
-                                    "+${f.added}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = SuccessGreen,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                            if (f.removed > 0) {
-                                Text(
-                                    "-${f.removed}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = ErrorRed,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                            Text("›", style = MaterialTheme.typography.titleMedium, color = TextDim)
-                        }
-                    }
-                }
-            }
-        }
+        DiffsStudio(
+            files = files,
+            loading = loading,
+            error = error,
+            notice = notice,
+            busy = busy,
+            onFile = { selected = it },
+            onCommit = { commitOpen = true },
+            onPr = { prOpen = true },
+            onRefresh = { container.appScope.launch { load() } },
+            onBack = onBack,
+        )
+    }
         if (commitOpen) {
             AlertDialog(
                 onDismissRequest = { if (!busy) commitOpen = false },
@@ -293,7 +214,6 @@ fun DiffsScreen(
                 dismissButton = { TextButton(onClick = { prOpen = false }) { Text("Cancelar") } },
             )
         }
-    }
 }
 
 @Composable
@@ -305,49 +225,32 @@ private fun DiffViewer(
 ) {
     val hScroll = rememberScrollState()
     Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-        Surface(color = ObsidianCard) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                    Text(
-                        file.path,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = MonoFonts,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    if (file.added > 0) {
-                        Text(
-                            "+${file.added}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = SuccessGreen,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    if (file.removed > 0) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "-${file.removed}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = ErrorRed,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                }
-                HorizontalDivider(color = ObsidianBorder)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            dev.hivemind.mobile.ui.CircleIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Voltar",
+                onClick = onBack,
+                tint = dev.hivemind.mobile.theme.TextPrimary,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                file.path.substringAfterLast('/'),
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = MonoFonts,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (file.added > 0) Text("+${file.added}", color = SuccessGreen, fontWeight = FontWeight.SemiBold)
+            if (file.removed > 0) {
+                Spacer(Modifier.width(8.dp))
+                Text("-${file.removed}", color = ErrorRed, fontWeight = FontWeight.SemiBold)
             }
         }
-
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             items(file.lines) { line ->
                 val (bg, fg) = when (line.kind) {
@@ -375,28 +278,135 @@ private fun DiffViewer(
             }
         }
 
-        Surface(color = ObsidianCard) {
-            Column {
-                HorizontalDivider(color = ObsidianBorder)
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-                    Button(
-                        onClick = onAskInChat,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandGold,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 44.dp),
+        Surface(color = dev.hivemind.mobile.theme.ObsidianBg) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                dev.hivemind.mobile.ui.PillButton("Ajustar este arquivo no Chat", onAskInChat)
+            }
+        }
+    }
+}
+
+@Composable
+fun DiffsStudio(
+    files: List<FileDiff>,
+    loading: Boolean,
+    error: String?,
+    notice: String?,
+    busy: Boolean,
+    onFile: (FileDiff) -> Unit,
+    onCommit: () -> Unit,
+    onPr: () -> Unit,
+    onRefresh: () -> Unit,
+    onBack: (() -> Unit)?,
+    emptyTitle: String = "Workspace limpo",
+    emptyBody: String = "Nenhuma alteração pendente de commit neste projeto.",
+) {
+    val added = files.sumOf { it.added }
+    val removed = files.sumOf { it.removed }
+    val kinds = files.groupBy { extOf(it.path) }.entries.sortedByDescending { it.value.size }.take(4)
+    dev.hivemind.mobile.ui.EntryScaffold(
+        applyInsets = false,
+        footer = {
+            if (!notice.isNullOrBlank()) {
+                Text(notice, color = SuccessGreen, style = MaterialTheme.typography.bodySmall)
+            }
+            when {
+                loading -> Unit
+                error != null -> dev.hivemind.mobile.ui.PillButton("Tentar de novo", onRefresh)
+                files.isEmpty() -> dev.hivemind.mobile.ui.PillButton("Atualizar", onRefresh)
+                else -> {
+                    dev.hivemind.mobile.ui.PillButton("Aprovar commit", onCommit, enabled = !busy && files.isNotEmpty())
+                    dev.hivemind.mobile.ui.PillButton("Aprovar PR", onPr, primary = false, enabled = !busy)
+                }
+            }
+        },
+    ) {
+        if (onBack != null) {
+            dev.hivemind.mobile.ui.EntryBackHeader("Diffs", onBack)
+            Spacer(Modifier.height(8.dp))
+        }
+        when {
+            loading -> Box(Modifier.fillMaxWidth().padding(top = 80.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = BrandGold)
+            }
+            error != null -> dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.ErrorOutline,
+                title = "Não deu para ler o diff",
+                body = error,
+            )
+            files.isEmpty() -> dev.hivemind.mobile.ui.StudioEmpty(
+                icon = Icons.Outlined.CheckCircle,
+                title = emptyTitle,
+                body = emptyBody,
+            )
+            else -> {
+                Text(
+                    files.size.toString(),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (files.size == 1) "arquivo alterado" else "arquivos alterados",
+                    color = TextDim,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(14.dp))
+                dev.hivemind.mobile.ui.ChangeBar(added, removed)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("+$added", color = SuccessGreen, fontWeight = FontWeight.SemiBold)
+                    Text("-$removed", color = ErrorRed, fontWeight = FontWeight.SemiBold)
+                }
+                if (kinds.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        kinds.forEach { (ext, group) ->
+                            StatusPill(text = "$ext ${group.size}", color = BrandGold)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                files.forEach { file ->
+                    val (mark, markColor) = statusStyle(file.status)
+                    HiveCard(
+                        onClick = { onFile(file) },
+                        modifier = Modifier.padding(bottom = 10.dp),
+                        contentPadding = PaddingValues(14.dp),
                     ) {
-                        Text("Ajustar este arquivo no Chat", fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusPill(text = mark, color = markColor)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    file.path.substringAfterLast('/'),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    file.path,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextDim,
+                                    fontFamily = MonoFonts,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Text("+${file.added}", color = SuccessGreen, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(6.dp))
+                            Text("-${file.removed}", color = ErrorRed, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        dev.hivemind.mobile.ui.ChangeBar(file.added, file.removed)
                     }
                 }
             }
         }
     }
 }
+
+private fun extOf(path: String): String = path.substringAfterLast('.', "arq").lowercase().ifBlank { "arq" }
 
 private fun statusStyle(status: String): Pair<String, Color> = when (status) {
     "A" -> "A" to SuccessGreen
@@ -406,3 +416,115 @@ private fun statusStyle(status: String): Pair<String, Color> = when (status) {
     "M" -> "M" to BrandGold
     else -> "•" to TextDim
 }
+
+@Composable
+fun DiffsPreview() {
+    DiffsStudio(
+        files = sampleDiffs(),
+        loading = false,
+        error = null,
+        notice = null,
+        busy = false,
+        onFile = {},
+        onCommit = {},
+        onPr = {},
+        onRefresh = {},
+        onBack = {},
+    )
+}
+
+@Composable
+fun DiffFilePreview() {
+    DiffViewer(file = sampleDiffs().first(), padding = PaddingValues(0.dp), onBack = {}, onAskInChat = {})
+}
+
+@Composable
+fun DiffsEmptyPreview() {
+    DiffsStudio(
+        files = emptyList(),
+        loading = false,
+        error = null,
+        notice = null,
+        busy = false,
+        onFile = {},
+        onCommit = {},
+        onPr = {},
+        onRefresh = {},
+        onBack = {},
+    )
+}
+
+@Composable
+fun DiffsErrorPreview() {
+    DiffsStudio(
+        files = emptyList(),
+        loading = false,
+        error = "O host respondeu 501: a IDE não está ligada.",
+        notice = null,
+        busy = false,
+        onFile = {},
+        onCommit = {},
+        onPr = {},
+        onRefresh = {},
+        onBack = {},
+    )
+}
+
+@Composable
+fun CommitDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        DiffsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianCard,
+            title = { Text("Commit") },
+            text = {
+                OutlinedTextField(
+                    value = "Ajusta o contraste da pílula principal",
+                    onValueChange = {},
+                    label = { Text("Mensagem") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = { TextButton(onClick = {}) { Text("Commit", color = BrandGold) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
+fun PrDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        DiffsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianCard,
+            title = { Text("Abrir pull request") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = "Contraste do onboarding", onValueChange = {}, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = "Texto escuro na pílula clara.", onValueChange = {}, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = { TextButton(onClick = {}) { Text("Abrir", color = BrandGold) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
+        )
+    }
+}
+
+private fun sampleDiffs() = listOf(
+    FileDiff(
+        path = "ui/EntryChrome.kt",
+        status = "M",
+        added = 12,
+        removed = 3,
+        lines = listOf(
+            DiffLine("hunk", "@@ função PillButton @@"),
+            DiffLine("context", "        ) {"),
+            DiffLine("removed", "-            Text(text)"),
+            DiffLine("added", "+            Text(text, color = foreground)"),
+            DiffLine("context", "        }"),
+        ),
+    ),
+    FileDiff(path = "README.md", status = "M", added = 2, removed = 1),
+)
