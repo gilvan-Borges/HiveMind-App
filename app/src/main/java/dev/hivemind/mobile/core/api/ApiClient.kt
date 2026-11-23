@@ -76,6 +76,12 @@ data class RunStartRequest(
 data class CancelRequest(val laneId: String)
 
 @Serializable
+data class SteerRequest(val laneId: String, val message: String)
+
+@Serializable
+data class SteerResponse(val steered: Boolean = false, val laneId: String = "")
+
+@Serializable
 data class ResolveRequest(val approvalId: String, val approved: Boolean)
 
 @Serializable
@@ -133,6 +139,10 @@ class ApiClient(
     suspend fun startRun(req: RunStartRequest): StartResponse = post("/api/v1/runs/start", req)
 
     suspend fun redirect(req: RunStartRequest): StartResponse = post("/api/v1/runs/redirect", req)
+
+    /** Injeta a nota na execução viva. Host antigo responde 404; sem run viva, 409. */
+    suspend fun steer(laneId: String, message: String): SteerResponse =
+        post("/api/v1/runs/steer", SteerRequest(laneId, message))
 
     suspend fun cancel(laneId: String): CancelResponse = post("/api/v1/runs/cancel", CancelRequest(laneId))
 
