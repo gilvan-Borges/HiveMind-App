@@ -1,7 +1,10 @@
 package dev.hivemind.mobile.features.relay
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,7 +16,9 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import dev.hivemind.mobile.features.pairing.LanPairingPreview
 import dev.hivemind.mobile.theme.HiveMindTheme
+import dev.hivemind.mobile.theme.ObsidianBg
 import dev.hivemind.mobile.theme.TextDim
+import dev.hivemind.mobile.ui.PillButton
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,6 +44,22 @@ class OnboardingPaparazziTest {
     @Test
     fun depoisPareamento() {
         paparazzi.snapshot(name = "depois-pareamento") { HiveMindTheme { LanPairingPreview() } }
+    }
+
+    @Test
+    fun pillClaroEEscuro() {
+        paparazzi.snapshot(name = "pill-claro-escuro") {
+            HiveMindTheme {
+                Column(Modifier.fillMaxWidth()) {
+                    Box(Modifier.background(ObsidianBg).padding(16.dp)) {
+                        PillButton(text = "Acesso remoto", onClick = {})
+                    }
+                    Box(Modifier.background(Color(0xFFF7F4EC)).padding(16.dp)) {
+                        PillButton(text = "Escanear QR da IDE", onClick = {})
+                    }
+                }
+            }
+        }
     }
 
     @Test

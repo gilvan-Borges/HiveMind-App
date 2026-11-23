@@ -85,6 +85,57 @@ fun LanPairingPreview() {
     }
 }
 
+@Composable
+fun LanPairingPastePreview() {
+    StaticEntry {
+        LanPairingContent(
+            onBack = {},
+            showManual = true,
+            pasted = "hivemind://pair?v=2&h=lab.local",
+            connecting = false,
+            error = null,
+            onScan = {},
+            onToggleManual = {},
+            onPasted = {},
+            onConnect = {},
+        )
+    }
+}
+
+@Composable
+fun QrScannerPreview() {
+    Box(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        Box(Modifier.align(Alignment.Center)) {
+            dev.hivemind.mobile.ui.QrHero()
+        }
+        Row(
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp, end = 8.dp).fillMaxWidth(),
+        ) {
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = {}) {
+                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = TextPrimary)
+            }
+        }
+        Text(
+            "Aponte para o QR exibido na IDE (modal App Mobile)",
+            color = TextPrimary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 24.dp),
+        )
+    }
+}
+
+@Composable
+fun QrPermissionPreview() {
+    Box(Modifier.fillMaxSize().background(dev.hivemind.mobile.theme.ObsidianBg)) {
+        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Permissão de câmera necessária para escanear o QR.", color = TextPrimary)
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = {}) { Text("Permitir câmera") }
+        }
+    }
+}
+
 /** Tela de pareamento LAN: QR `hivemind://pair?v=2` ou colar o mesmo código. */
 @Composable
 fun PairingScreen(container: AppContainer, onBack: (() -> Unit)? = null) {

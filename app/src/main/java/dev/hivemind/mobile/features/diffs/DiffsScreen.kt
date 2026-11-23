@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
+import dev.hivemind.mobile.core.models.DiffLine
 import dev.hivemind.mobile.core.models.FileDiff
 import dev.hivemind.mobile.theme.ApprovalAmber
 import dev.hivemind.mobile.theme.DiffAddedBg
@@ -406,3 +407,123 @@ private fun statusStyle(status: String): Pair<String, Color> = when (status) {
     "M" -> "M" to BrandGold
     else -> "•" to TextDim
 }
+
+@Composable
+fun DiffsPreview() {
+    val files = sampleDiffs()
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Diffs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("2 arquivo(s) · +14 -4", style = MaterialTheme.typography.labelSmall, color = TextDim)
+                    }
+                    TextButton(onClick = {}) { Text("Aprovar commit", color = BrandGold) }
+                    TextButton(onClick = {}) { Text("Aprovar PR", color = BrandGold) }
+                }
+                HorizontalDivider(color = ObsidianBorder)
+            }
+        }
+        LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(files, key = { it.path }) { f ->
+                val (mark, markColor) = statusStyle(f.status)
+                HiveCard(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatusPill(text = mark, color = markColor)
+                        Text(f.path, style = MaterialTheme.typography.bodySmall, fontFamily = MonoFonts, modifier = Modifier.weight(1f), maxLines = 2)
+                        if (f.added > 0) Text("+${f.added}", color = SuccessGreen, fontWeight = FontWeight.SemiBold)
+                        if (f.removed > 0) Text("-${f.removed}", color = ErrorRed, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DiffFilePreview() {
+    DiffViewer(file = sampleDiffs().first(), padding = PaddingValues(0.dp), onBack = {}, onAskInChat = {})
+}
+
+@Composable
+fun DiffsEmptyPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Text(
+                "Diffs",
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        EmptyStatePanel(
+            title = "Workspace limpo",
+            subtitle = "Nenhuma alteração pendente de commit neste projeto.",
+            actionLabel = "Atualizar",
+            onAction = {},
+        )
+    }
+}
+
+@Composable
+fun CommitDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        DiffsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianCard,
+            title = { Text("Commit") },
+            text = {
+                OutlinedTextField(
+                    value = "Ajusta o contraste da pílula principal",
+                    onValueChange = {},
+                    label = { Text("Mensagem") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = { TextButton(onClick = {}) { Text("Commit", color = BrandGold) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
+fun PrDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        DiffsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianCard,
+            title = { Text("Abrir pull request") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = "Contraste do onboarding", onValueChange = {}, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = "Texto escuro na pílula clara.", onValueChange = {}, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = { TextButton(onClick = {}) { Text("Abrir", color = BrandGold) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
+        )
+    }
+}
+
+private fun sampleDiffs() = listOf(
+    FileDiff(
+        path = "ui/EntryChrome.kt",
+        status = "M",
+        added = 12,
+        removed = 3,
+        lines = listOf(
+            DiffLine("hunk", "@@ função PillButton @@"),
+            DiffLine("context", "        ) {"),
+            DiffLine("removed", "-            Text(text)"),
+            DiffLine("added", "+            Text(text, color = foreground)"),
+            DiffLine("context", "        }"),
+        ),
+    ),
+    FileDiff(path = "README.md", status = "M", added = 2, removed = 1),
+)

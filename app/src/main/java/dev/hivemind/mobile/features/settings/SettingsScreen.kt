@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -116,6 +117,83 @@ fun SettingsPreview() {
         )
         Spacer(Modifier.height(12.dp))
         SettingsGroup(listOf(SettingsRow("Trocar IDE", "Volta para as IDEs da conta no relay", destructive = true) {}))
+        Spacer(Modifier.height(12.dp))
+        SettingsGroup(listOf(SettingsRow("Permissão do projeto", "governed") {}))
+        Spacer(Modifier.height(12.dp))
+        RoutineBlock()
+    }
+}
+
+@Composable
+private fun RoutineBlock() {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = ObsidianCard,
+        border = BorderStroke(1.dp, ObsidianBorder),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column {
+            Text(
+                "Rotinas do Agent Hive",
+                modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.titleSmall,
+                color = TextDim,
+            )
+            RoutineRow("Revisar PRs do org-alpha", "0 9 * * 1-5", true)
+            HorizontalDivider(color = ObsidianBorder)
+            RoutineRow("Resumo da manhã", "30 8 * * *", false)
+        }
+    }
+}
+
+@Composable
+private fun RoutineRow(title: String, expr: String, enabled: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, maxLines = 2)
+            Text(expr, style = MaterialTheme.typography.bodySmall, color = TextDim)
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = {},
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = BrandGold,
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        )
+    }
+}
+
+@Composable
+fun SettingsSwitchDialogPreview() {
+    Box(Modifier.fillMaxSize().background(SurfacePanel)) {
+        SettingsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianSurface,
+            title = { Text("Trocar de IDE?") },
+            text = { Text("A lista de IDEs da conta no relay abre em seguida. O pareamento da conta permanece.", color = TextDim) },
+            confirmButton = { TextButton(onClick = {}) { Text("Trocar IDE", color = ErrorRed) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
+fun SettingsPermissionDialogPreview() {
+    Box(Modifier.fillMaxSize().background(SurfacePanel)) {
+        SettingsPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = ObsidianSurface,
+            title = { Text("Permissão do projeto") },
+            text = { Text("Full grava o modo no projeto. Governado volta a pedir aprovação.", color = TextDim) },
+            confirmButton = { TextButton(onClick = {}) { Text("Full", color = BrandGold) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Governado") } },
+        )
     }
 }
 

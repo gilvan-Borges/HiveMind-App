@@ -657,3 +657,82 @@ private fun AutoReviewEntryRow(e: AutoReviewEntry) {
 private fun Center(content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
 }
+
+@Composable
+fun FlowTasksPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Column {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text("Fluxo & Jira", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("org-alpha", style = MaterialTheme.typography.labelSmall, color = TextDim)
+                }
+                TabRow(selectedTabIndex = 0, containerColor = ObsidianCard) {
+                    Tab(selected = true, onClick = {}, text = { Text("Minhas Tasks") })
+                    Tab(selected = false, onClick = {}, text = { Text("PRs") })
+                    Tab(selected = false, onClick = {}, text = { Text("Auto-Review") })
+                }
+            }
+        }
+        HiveCard(modifier = Modifier.padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill(text = "PROJ-123", color = BrandGold)
+                StatusPill(text = "Em andamento", color = ApprovalAmber)
+                StatusPill(text = "Minha", color = SuccessGreen)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Revisar o contraste das pílulas", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGold, contentColor = MaterialTheme.colorScheme.onPrimary),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+            ) { Text("Resolver c/ Equipe", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+@Composable
+fun FlowEmptyPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Text("Fluxo & Jira", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+        EmptyStatePanel(
+            title = "Nenhuma task atribuída",
+            subtitle = "Tasks atribuídas a você no Jira ou GitHub aparecerão aqui.",
+            actionLabel = "Atualizar",
+            onAction = {},
+        )
+    }
+}
+
+@Composable
+fun FlowErrorPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Text("Fluxo & Jira", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+        Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            ErrorBanner(message = "O host respondeu 501: a IDE não está ligada.", actionLabel = "Tentar", onAction = {})
+        }
+    }
+}
+
+@Composable
+fun FlowPrsPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Surface(color = ObsidianCard) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Text("Fluxo & Jira", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("1 PR(s) aberto(s)", color = TextDim, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        HiveCard(modifier = Modifier.padding(12.dp), highlighted = true, accentColor = ApprovalAmber) {
+            StatusPill(text = "#42", color = BrandGold)
+            Spacer(Modifier.height(8.dp))
+            Text("Contraste do onboarding", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+            Text("example-dev · revisão pedida", color = TextDim, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}

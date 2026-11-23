@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import dev.hivemind.mobile.AppContainer
 import dev.hivemind.mobile.MainTab
 import dev.hivemind.mobile.core.models.ProjectSummary
+import dev.hivemind.mobile.core.state.ConnState
 import dev.hivemind.mobile.theme.ActionPrimary
 import dev.hivemind.mobile.theme.ActionPrimaryText
 import dev.hivemind.mobile.theme.ApprovalAmber
@@ -423,6 +424,66 @@ private fun MetaChip(label: String) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
+fun ManageProjectsPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Projetos", style = MaterialTheme.typography.titleLarge)
+                ConnectionBadge(conn = ConnState.Connected, routeLabel = "LAN · lab.local", relayMode = false, ideOffline = false)
+            }
+        }
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ProjectCard(
+                p = ProjectSummary("/work/org-alpha", "org-alpha", "main", "", "equipe", "", 1, 1, "governed"),
+                isActive = true,
+                onSelectChat = {},
+                onSelectFlow = {},
+                onSelectDiffs = {},
+            )
+            ProjectCard(
+                p = ProjectSummary("/work/acme", "acme", "dev", "", "", "", 0, 0, "full"),
+                isActive = false,
+                onSelectChat = {},
+                onSelectFlow = {},
+                onSelectDiffs = {},
+            )
+        }
+    }
+}
+
+@Composable
+fun ManageProjectsEmptyPreview() {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Projetos", style = MaterialTheme.typography.titleLarge)
+            ConnectionBadge(conn = ConnState.Disconnected, routeLabel = null, relayMode = false, ideOffline = true)
+        }
+        EmptyStatePanel(
+            title = "Nenhum projeto aberto na IDE",
+            subtitle = "Abra uma pasta na HiveMind IDE do seu PC para controlar as equipes, diffs e tarefas aqui pelo celular.",
+            actionLabel = "Atualizar agora",
+            onAction = {},
+            secondaryLabel = "Desconectar",
+            onSecondary = {},
+        )
+    }
+}
+
+@Composable
+fun UnpairDialogPreview() {
+    Box(Modifier.fillMaxSize()) {
+        ManageProjectsEmptyPreview()
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Desconectar do PC?") },
+            text = { Text("O pareamento e as chaves deste aparelho serão apagados. Para voltar, escaneie o QR novo da IDE.", color = TextDim) },
+            confirmButton = { TextButton(onClick = {}) { Text("Desconectar", color = ErrorRed) } },
+            dismissButton = { TextButton(onClick = {}) { Text("Cancelar") } },
         )
     }
 }

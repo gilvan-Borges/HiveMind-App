@@ -1086,5 +1086,110 @@ private fun CreateMemberDialog(onDismiss: () -> Unit, onSubmit: (String, String)
     )
 }
 
+@Composable
+fun GateAccountsPreview() {
+    StaticEntry {
+        GateHome(
+            accounts = listOf(
+                dev.hivemind.mobile.core.relay.AccountMeta("a1", "conta@example.com", "owner", "https://relay.example.com"),
+            ),
+            notice = null,
+            onRemote = {},
+            onLan = {},
+            onAccount = {},
+        )
+    }
+}
+
+@Composable
+fun RelayErrorPreview() {
+    StaticEntry {
+        RelayEntry(
+            relayUrl = "https://relay.example.com",
+            email = "conta@example.com",
+            password = "",
+            showPassword = false,
+            emailOpen = true,
+            busy = false,
+            error = "Senha recusada. Confira a conta ou gere um QR novo na IDE.",
+            onRelayUrl = {},
+            onEmail = {},
+            onPassword = {},
+            onTogglePassword = {},
+            onToggleEmail = {},
+            onScan = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Composable
+fun DevicesPreview() {
+    Column(Modifier.fillMaxSize().edgeInsets()) {
+        Surface(color = ObsidianCard, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Suas IDEs", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("conta@example.com · relay.example.com", color = TextDim, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DeviceRow(
+                device = dev.hivemind.mobile.core.relay.DeviceInfo(id = "ide-1", name = "pc-lab", online = true, e2eReady = true),
+                busy = false,
+                onOpen = {},
+                onRevoke = {},
+            )
+            DeviceRow(
+                device = dev.hivemind.mobile.core.relay.DeviceInfo(id = "ide-2", name = "notebook", online = false, e2eReady = false),
+                busy = false,
+                onOpen = {},
+                onRevoke = {},
+            )
+        }
+    }
+}
+
+@Composable
+fun DevicesEmptyPreview() {
+    Column(Modifier.fillMaxSize().edgeInsets()) {
+        Surface(color = ObsidianCard, modifier = Modifier.fillMaxWidth()) {
+            Text("Suas IDEs", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
+        EmptyStatePanel(
+            title = "Nenhuma IDE vinculada",
+            subtitle = "Gere um código na IDE (Acesso remoto) ou escaneie o QR para começar.",
+            actionLabel = "Vincular primeira IDE",
+            onAction = {},
+            secondaryLabel = "Pareamento na rede local",
+            onSecondary = {},
+        )
+    }
+}
+
+@Composable
+fun LinkIdePreview() {
+    Column(Modifier.fillMaxSize().edgeInsets().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text("Vincular IDE", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text("Os dois lados precisam estar na mesma conta. O código vale 10 minutos.", color = TextDim, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(14.dp))
+        HiveCard(contentPadding = PaddingValues(16.dp)) {
+            Button(
+                onClick = {},
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGold, contentColor = MaterialTheme.colorScheme.onPrimary),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Escanear QR da IDE", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = "",
+                onValueChange = {},
+                label = { Text("Ou digite o código (ABCD-EFGH-JK)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
 private fun hostOf(url: String): String =
     url.removePrefix("https://").removePrefix("http://").substringBefore("/").ifBlank { url }

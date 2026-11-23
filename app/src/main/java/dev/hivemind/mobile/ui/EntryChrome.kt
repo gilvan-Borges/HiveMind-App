@@ -358,7 +358,7 @@ fun PillButton(
                 color = foreground,
             )
         } else {
-            Text(text, fontWeight = FontWeight.SemiBold)
+            Text(text, fontWeight = FontWeight.SemiBold, color = foreground)
         }
     }
 }

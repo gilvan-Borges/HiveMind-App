@@ -155,7 +155,6 @@ private fun hiveText(
     tracking: androidx.compose.ui.unit.TextUnit = 0.sp,
     family: FontFamily = HiveFonts,
 ) = TextStyle(
-    color = TextPrimary,
     fontSize = size,
     lineHeight = line,
     fontWeight = weight,
