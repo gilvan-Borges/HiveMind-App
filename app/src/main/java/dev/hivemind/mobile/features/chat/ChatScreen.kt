@@ -208,7 +208,9 @@ fun coalesceChatEvents(events: List<LaneEventItem>): List<ChatDisplayItem> {
                 if (e.text.isEmpty()) continue
                 val authorLabel = e.label.ifBlank { e.author }.ifBlank { "Equipe" }
                 val isUser = e.author.equals("user", ignoreCase = true) ||
-                    e.label.equals("Você", ignoreCase = true)
+                    e.author.equals("mobile", ignoreCase = true) ||
+                    e.label.equals("Você", ignoreCase = true) ||
+                    e.label.equals("Celular", ignoreCase = true)
                 val prev = out.lastOrNull() as? ChatDisplayItem.TextBubble
                 if (prev != null && prev.authorLabel == authorLabel && prev.isUser == isUser) {
                     out[out.lastIndex] = prev.copy(text = prev.text + e.text)

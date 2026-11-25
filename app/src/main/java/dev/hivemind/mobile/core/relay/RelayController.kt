@@ -649,7 +649,11 @@ class RelayController(
             is FrameEffect.Presence -> {
                 // Presença instantânea (Spec 09/W5-02): o polling de 20s vira fallback.
                 if (effect.role != "app") {
+                    val wasOffline = !ideOnlineFlow.value
                     ideOnlineFlow.value = effect.online
+                    if (wasOffline && effect.online) {
+                        scope.launch { onHello(device) }
+                    }
                 }
             }
             FrameEffect.Ignored -> Unit
